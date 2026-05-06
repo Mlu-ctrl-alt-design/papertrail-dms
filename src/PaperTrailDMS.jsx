@@ -1,4 +1,4 @@
-import { useState, useReducer, useContext, createContext, useRef, useEffect, useCallback } from "react";
+import { useState, useReducer, useContext, createContext, useRef, useEffect, useCallback, Fragment } from "react";
 import {
   FolderOpen20Regular, Folder20Regular, Document20Regular, ClipboardTextLtr20Regular,
   Pin20Regular, Send20Regular, Archive20Regular, Calendar20Regular, ArrowDownload20Regular,
@@ -17,7 +17,7 @@ import {
   Scan20Regular, Print20Regular, Server20Regular, DataHistogram20Regular,
   Hourglass20Regular, Receipt20Regular, BarcodeScanner20Regular, DocumentArrowUp20Regular,
   PlugConnected20Regular, CloudSync20Regular, CloudArchive20Regular, Database20Regular,
-  Money20Regular, Add20Regular,
+  Money20Regular, Add20Regular, ArrowLeft20Regular,
 } from "@fluentui/react-icons";
 
 // ─── Icon Helper ──────────────────────────────────────────────────────────────
@@ -669,7 +669,7 @@ function SearchView(){
   ];
   const onClickRow=(d)=>{ if(d.id===RESTRICTED_ID) setAccessRequest(true); else setPreview(d); };
   return <div style={{display:"flex",flexDirection:"column",height:"100%",overflow:"hidden"}}>
-    <ViewHeader title="Search" subtitle="Full-text search across documents · OCR + tags + metadata"/>
+    <ViewHeader title="Search" subtitle="Full-text search across documents · OCR + tags + metadata" commandView="search"/>
     <DataTable rows={rows} columns={cols} getKey={d=>d.id} defaultSort={{col:"_match",dir:"desc"}} searchPlaceholder="Search by name, tag, owner, folder…" searchKeys={["name","folder","owner","status"]} onRowClick={onClickRow} selectedKey={preview?.id} emptyMessage="No documents match this search."/>
     {preview&&<Drawer onClose={()=>setPreview(null)} width={520}>
       <div style={{display:"flex",flexDirection:"column",height:"100%",overflow:"hidden"}}>
@@ -726,7 +726,7 @@ function WorkflowView(){
   ];
   const selected=selectedId?state.workflows.find(w=>w.id===selectedId):null;
   return <div style={{display:"flex",flexDirection:"column",height:"100%",overflow:"hidden"}}>
-    <ViewHeader title="Approval Workflows" subtitle={`${state.workflows.length} active · ${state.workflows.filter(w=>w.assigneeId==="u4").length} assigned to you`} action={<Btn onClick={()=>setShowBuilder(true)}>+ New Workflow</Btn>}/>
+    <ViewHeader title="Approval Workflows" subtitle={`${state.workflows.length} active · ${state.workflows.filter(w=>w.assigneeId==="u4").length} assigned to you`} action={<Btn onClick={()=>setShowBuilder(true)}>+ New Workflow</Btn>} commandView="workflow"/>
     <DataTable rows={state.workflows} columns={cols} getKey={w=>w.id} defaultSort={{col:"due",dir:"asc"}} searchPlaceholder="Search by document, step, or assignee…" searchKeys={["doc","step"]} onRowClick={w=>setSelectedId(w.id)} selectedKey={selectedId} emptyMessage="No workflows match this filter."/>
     {selected&&<Drawer onClose={()=>setSelectedId(null)} width={560}><WorkflowDrawer wf={selected} onClose={()=>setSelectedId(null)} onAnnotate={()=>setShowAnnotation(selected)}/></Drawer>}
     {showBuilder&&<WorkflowBuilder onClose={()=>setShowBuilder(false)}/>}
@@ -921,9 +921,9 @@ function RetentionView(){
     setSelected([]); setDeleteConfirm(false); setDeleteInput("");
   };
   const metrics=[{label:"Due for review",val:3,icon:ClipboardTextLtr20Regular,color:"#219CD6"},{label:"Flagged for deletion",val:2,icon:Delete20Regular,color:"#a4262c"},{label:"Archived this year",val:14,icon:Archive20Regular,color:"#c8a116"},{label:"Storage saved",val:"2.4 GB",icon:Save20Regular,color:"#107c10"}];
-  return <div style={{padding:24,overflow:"auto",height:"100%"}}>
-    <div style={{fontSize:18,fontWeight:700,marginBottom:4}}>Retention & Archiving</div>
-    <div style={{fontSize:13,color:"#605e5c",marginBottom:20}}>Manage document lifecycle, policies, and scheduled purges</div>
+  return <div style={{display:"flex",flexDirection:"column",height:"100%",overflow:"hidden"}}>
+    <ViewHeader title="Retention & Archiving" subtitle="Manage document lifecycle, policies, and scheduled purges" commandView="retention"/>
+    <div style={{padding:24,overflow:"auto",flex:1}}>
     <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:24}}>
       {metrics.map(m=><div key={m.label} style={{background:"rgba(255,255,255,0.85)",border:"1px solid rgba(0,0,0,0.07)",borderRadius:10,padding:"16px",textAlign:"center",boxShadow:"0 2px 6px rgba(0,0,0,0.05)"}}>
         <div style={{marginBottom:6,color:m.color}}><I as={m.icon} size={28}/></div>
@@ -1028,6 +1028,7 @@ function RetentionView(){
       </div>
     </Modal>}
     {showPolicyModal&&<PolicyBuilder onClose={()=>setShowPolicyModal(false)}/>}
+    </div>
   </div>;
 }
 
@@ -1066,7 +1067,7 @@ function AuditView(){
   ];
   const exportBtns=<><Btn size="sm"><I as={ArrowDownload20Regular} size={13}/> Export CSV</Btn><Btn size="sm" variant="secondary"><I as={ArrowDownload20Regular} size={13}/> Export PDF</Btn></>;
   return <div style={{display:"flex",flexDirection:"column",height:"100%",overflow:"hidden"}}>
-    <ViewHeader title="Audit Log" subtitle={`Immutable activity record · ${state.auditLog.length} entries · 7yr retention`} action={<div style={{display:"flex",gap:8}}>{exportBtns}</div>}/>
+    <ViewHeader title="Audit Log" subtitle={`Immutable activity record · ${state.auditLog.length} entries · 7yr retention`} action={<div style={{display:"flex",gap:8}}>{exportBtns}</div>} commandView="audit"/>
     <DataTable rows={state.auditLog} columns={cols} getKey={e=>e.id} defaultSort={{col:"time",dir:"desc"}} searchPlaceholder="Search by user, action, or document…" searchKeys={["user","action","doc"]} emptyMessage="No audit entries match this filter."/>
   </div>;
 }
@@ -1141,7 +1142,7 @@ function DocsView(){
     {id:"modified",label:"Modified",get:d=>d.modified,width:140,renderCell:d=><span style={{whiteSpace:"nowrap",color:"#605e5c"}}>{d.modified}</span>},
   ];
   return <div style={{display:"flex",flexDirection:"column",height:"100%",overflow:"hidden"}}>
-    <ViewHeader title="Documents" subtitle={`${filtered.length} document${filtered.length!==1?"s":""} in ${folder} · Azure Blob Storage (SA North)`} action={<Btn onClick={()=>setShowUpload(true)}>+ Upload</Btn>}/>
+    <ViewHeader title="Documents" subtitle={`${filtered.length} document${filtered.length!==1?"s":""} in ${folder} · Azure Blob Storage (SA North)`} action={<Btn onClick={()=>setShowUpload(true)}>+ Upload</Btn>} commandView="docs"/>
     <StorageSummary docs={state.documents} rehydrations={state.rehydrations}/>
     <div style={{display:"flex",flex:1,overflow:"hidden",minHeight:0,marginTop:12}}>
       <div style={{width:170,borderRight:"1px solid #e1dfdd",padding:"12px 8px",background:"#fff",flexShrink:0,overflow:"auto"}}>
@@ -1350,14 +1351,17 @@ function ColumnFilterPopover({options,selected,onToggle,onClose,onClear}){
 }
 
 // ─── ViewHeader (Fluent 2 page header) ────────────────────────────────────────
-function ViewHeader({title,subtitle,action}){
-  return <div style={{padding:"14px 20px",borderBottom:"1px solid #e1dfdd",background:"#fff",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"space-between",gap:12}}>
-    <div style={{minWidth:0}}>
-      <div style={{fontSize:18,fontWeight:700,color:"#201f1e"}}>{title}</div>
-      {subtitle&&<div style={{fontSize:12,color:"#605e5c",marginTop:1}}>{subtitle}</div>}
+function ViewHeader({title,subtitle,action,commandView,canBack,onBack}){
+  return <Fragment>
+    <div style={{padding:"14px 20px",borderBottom:"1px solid #e1dfdd",background:"#fff",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"space-between",gap:12}}>
+      <div style={{minWidth:0}}>
+        <div style={{fontSize:18,fontWeight:700,color:"#201f1e"}}>{title}</div>
+        {subtitle&&<div style={{fontSize:12,color:"#605e5c",marginTop:1}}>{subtitle}</div>}
+      </div>
+      {action}
     </div>
-    {action}
-  </div>;
+    {commandView&&<CommandBar active={commandView} canBack={!!canBack} onBack={onBack}/>}
+  </Fragment>;
 }
 
 // ─── DataTable (Fluent 2: search + sort + col filters + pagination + sticky) ──
@@ -1507,7 +1511,7 @@ function RegistryView(){
   ];
   const selected=selectedId?employeeById(state,selectedId):null;
   return <div style={{display:"flex",flexDirection:"column",height:"100%",overflow:"hidden"}}>
-    <ViewHeader title="The Registry" subtitle={`Public-servant records · Z83 compliant · ${state.employees.length} active records`} action={<Btn onClick={()=>setShowZ83(true)}>+ New Z83 Inception</Btn>}/>
+    <ViewHeader title="The Registry" subtitle={`Public-servant records · Z83 compliant · ${state.employees.length} active records`} action={<Btn onClick={()=>setShowZ83(true)}>+ New Z83 Inception</Btn>} commandView="registry"/>
     <DataTable rows={state.employees} columns={cols} getKey={e=>e.id} defaultSort={{col:"lastName",dir:"asc"}} searchPlaceholder="Search by name, PERSAL, ID, job title, or department…" searchKeys={["persalNo","idNumber","firstName","lastName","department","jobTitle"]} onRowClick={e=>setSelectedId(e.id)} selectedKey={selectedId} emptyMessage="No records match this filter."/>
     {selected&&<Drawer onClose={()=>setSelectedId(null)} width={680}><EmployeeProfile employee={selected} onClose={()=>setSelectedId(null)}/></Drawer>}
     {showZ83&&<Z83InceptionModal onClose={()=>setShowZ83(false)}/>}
@@ -2011,6 +2015,7 @@ function EmployeeProfileScreen({employee,onClose}){
         ))}
       </div>
     </div>
+    <CommandBar active="profile" canBack onBack={onClose}/>
 
     {/* Body — two-column */}
     <div style={{flex:1,overflow:"auto",padding:"20px 24px"}}>
@@ -2459,8 +2464,94 @@ function IngestView(){
         ))}
       </div>
     </div>
+    <CommandBar active="ingest"/>
     <div style={{flex:1,overflow:"hidden"}}>
       {tab==="scan"?<ScanView/>:<PrintQueueView/>}
+    </div>
+  </div>;
+}
+
+// ─── Command Bar (Fluent contextual toolbar) ──────────────────────────────────
+function CommandBtn({icon,label,onClick,danger,disabled}){
+  return <button onClick={disabled?undefined:onClick} disabled={disabled} style={{background:"transparent",border:"none",padding:"0 12px",height:42,cursor:disabled?"not-allowed":"pointer",fontFamily:"inherit",fontSize:13,color:disabled?"#a19f9d":danger?"#a4262c":"rgba(26,26,26,0.78)",display:"inline-flex",alignItems:"center",gap:7,whiteSpace:"nowrap",borderRadius:6,opacity:disabled?0.6:1,transition:"background 0.15s"}} onMouseEnter={e=>{if(!disabled)e.currentTarget.style.background=danger?"#fde7e9":"#f3f2f1";}} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+    <I as={icon} size={15}/>
+    <span>{label}</span>
+  </button>;
+}
+function CmdDivider(){return <div style={{width:1,alignSelf:"stretch",background:"#E1E1E2",margin:"0 4px"}}/>;}
+function CommandBar({active,onBack,canBack}){
+  const toast=useToast();
+  const flash=(label)=>toast(label,"Command queued",{icon:<I as={Info20Regular} size={16} color="#219CD6"/>,color:"#219CD6"});
+  const groups=(()=>{
+    switch(active){
+      case "docs": return [
+        [{icon:DocumentArrowUp20Regular,label:"Upload",onClick:()=>flash("Upload document")},{icon:Folder20Regular,label:"New folder",onClick:()=>flash("New folder created")},{icon:Save20Regular,label:"Save as",onClick:()=>flash("Save as…")}],
+        [{icon:Edit20Regular,label:"Edit",onClick:()=>flash("Edit metadata")},{icon:Folder20Regular,label:"Move",onClick:()=>flash("Move to folder")},{icon:Delete20Regular,label:"Delete",danger:true,onClick:()=>flash("Delete document")}],
+        [{icon:Info20Regular,label:"Properties",onClick:()=>flash("Properties panel")}],
+        [{right:true,icon:ArrowDownload20Regular,label:"Export PDF",onClick:()=>flash("Exporting PDF")},{right:true,icon:ArrowDownload20Regular,label:"Export CSV",onClick:()=>flash("Exporting CSV")}],
+      ];
+      case "ingest": return [
+        [{icon:Scan20Regular,label:"Start scan",onClick:()=>flash("Starting scan job")},{icon:Print20Regular,label:"New print job",onClick:()=>flash("Print job queued")}],
+        [{icon:PlugConnected20Regular,label:"Manage scanners",onClick:()=>flash("Scanner devices")},{icon:BarcodeScanner20Regular,label:"Test separator",onClick:()=>flash("Testing separator sheet")}],
+        [{icon:Info20Regular,label:"Properties",onClick:()=>flash("Properties panel")}],
+        [{right:true,icon:ArrowDownload20Regular,label:"Export job log",onClick:()=>flash("Exporting job log")}],
+      ];
+      case "registry": return [
+        [{icon:Add20Regular,label:"New Z83",onClick:()=>flash("Open Z83 form")},{icon:DocumentArrowUp20Regular,label:"Bulk import",onClick:()=>flash("Bulk import Z83")}],
+        [{icon:Edit20Regular,label:"Edit",onClick:()=>flash("Edit record")},{icon:Archive20Regular,label:"Archive",onClick:()=>flash("Archive record")}],
+        [{icon:ContactCard20Regular,label:"Print roster",onClick:()=>flash("Printing roster")}],
+        [{right:true,icon:ArrowDownload20Regular,label:"Export PDF",onClick:()=>flash("Exporting PDF")},{right:true,icon:ArrowDownload20Regular,label:"Export CSV",onClick:()=>flash("Exporting CSV")}],
+      ];
+      case "workflow": return [
+        [{icon:Add20Regular,label:"New workflow",onClick:()=>flash("Open workflow builder")}],
+        [{icon:Checkmark20Regular,label:"Bulk approve",onClick:()=>flash("Bulk approve queued")},{icon:Dismiss20Regular,label:"Bulk reject",danger:true,onClick:()=>flash("Bulk reject queued")}],
+        [{icon:Info20Regular,label:"Properties",onClick:()=>flash("Properties panel")}],
+        [{right:true,icon:ArrowDownload20Regular,label:"Export queue",onClick:()=>flash("Exporting workflow queue")}],
+      ];
+      case "search": return [
+        [{icon:Bookmark20Regular,label:"Save search",onClick:()=>flash("Search saved")},{icon:Dismiss20Regular,label:"Clear",onClick:()=>flash("Cleared filters")}],
+        [{icon:Info20Regular,label:"Search tips",onClick:()=>flash("Search syntax")}],
+      ];
+      case "audit": return [
+        [{icon:CalendarLtr20Regular,label:"Date range",onClick:()=>flash("Date filter")},{icon:Filter20Regular,label:"Advanced filter",onClick:()=>flash("Advanced filter")}],
+        [{icon:Info20Regular,label:"Retention policy",onClick:()=>flash("Audit retention: 7yr")}],
+        [{right:true,icon:ArrowDownload20Regular,label:"Export PDF",onClick:()=>flash("Exporting PDF")},{right:true,icon:ArrowDownload20Regular,label:"Export CSV",onClick:()=>flash("Exporting CSV")}],
+      ];
+      case "retention": return [
+        [{icon:Add20Regular,label:"New policy",onClick:()=>flash("New retention policy")},{icon:Hourglass20Regular,label:"Run now",onClick:()=>flash("Running retention job")}],
+        [{icon:Edit20Regular,label:"Edit",onClick:()=>flash("Edit policy")},{icon:Delete20Regular,label:"Delete",danger:true,onClick:()=>flash("Delete policy")}],
+        [{icon:Info20Regular,label:"Compliance log",onClick:()=>flash("Compliance log")}],
+        [{right:true,icon:ArrowDownload20Regular,label:"Export schedule",onClick:()=>flash("Exporting schedule")}],
+      ];
+      case "profile": return [
+        [{icon:Edit20Regular,label:"Edit profile",onClick:()=>flash("Edit profile")},{icon:Print20Regular,label:"Print record",onClick:()=>flash("Printing employee record")}],
+        [{icon:Mail20Regular,label:"Message",onClick:()=>flash("Compose message")},{icon:CalendarLtr20Regular,label:"Schedule",onClick:()=>flash("Open scheduler")}],
+        [{right:true,icon:ArrowDownload20Regular,label:"Export full record",onClick:()=>flash("Exporting full record")}],
+      ];
+      default: return [];
+    }
+  })();
+  if(groups.length===0) return null;
+  return <div style={{padding:"8px 16px 0 16px",background:"transparent",flexShrink:0}}>
+    <div style={{background:"#fff",borderRadius:22,border:"1px solid #E1E1E2",boxShadow:"0 1px 3px rgba(26,26,26,0.06)",height:46,display:"flex",alignItems:"center",padding:"0 8px",gap:0,overflowX:"auto"}}>
+      <button onClick={canBack?onBack:undefined} disabled={!canBack} title={canBack?"Back":"Nothing to go back to"} style={{background:"transparent",border:"none",padding:"0 8px",height:42,cursor:canBack?"pointer":"not-allowed",color:canBack?"#52525B":"#c8c6c4",display:"inline-flex",alignItems:"center",borderRadius:6,opacity:canBack?1:0.5,transition:"background 0.15s"}} onMouseEnter={e=>{if(canBack)e.currentTarget.style.background="#f3f2f1";}} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+        <I as={ArrowLeft20Regular} size={18}/>
+      </button>
+      <CmdDivider/>
+      {groups.filter(g=>!g[0]?.right).map((items,gi)=>(
+        <Fragment key={"l"+gi}>
+          {gi>0&&<CmdDivider/>}
+          {items.map((item,ii)=><CommandBtn key={"l"+gi+"-"+ii} {...item}/>)}
+        </Fragment>
+      ))}
+      <div style={{flex:1}}/>
+      {groups.filter(g=>g[0]?.right).map((items,gi)=>(
+        <Fragment key={"r"+gi}>
+          {gi>0&&<CmdDivider/>}
+          <CmdDivider/>
+          {items.map((item,ii)=><CommandBtn key={"r"+gi+"-"+ii} {...item}/>)}
+        </Fragment>
+      ))}
     </div>
   </div>;
 }
@@ -2653,10 +2744,10 @@ export default function App(){
     <div style={{display:"flex",flexDirection:"column",height:"100vh",overflow:"hidden",background:"linear-gradient(150deg,#e8f4fc 0%,#f3f3f1 45%,#faf9f8 100%)",fontFamily:"'Segoe UI',system-ui,sans-serif"}}>
       <TopBar active={active} dispatch={dispatch} state={state} collapsed={collapsed} setCollapsed={setCollapsed} onCmdPalette={()=>setShowCmd(true)} onActivity={()=>setShowActivity(v=>!v)} setActive={setActive}/>
       <div style={{display:"flex",flex:1,overflow:"hidden",position:"relative",minHeight:0}}>
-        <TopProgressBar active={navLoading}/>
         <Sidebar active={active} setActive={setActive} collapsed={collapsed} setCollapsed={setCollapsed}/>
         <main style={{flex:1,overflow:"hidden",display:"flex",flexDirection:"column",position:"relative",minWidth:0}}>
-          <div style={{flex:1,overflow:"hidden"}}>{profileEmp?<EmployeeProfileScreen employee={profileEmp} onClose={()=>setProfileEmpId(null)}/>:<ActiveView/>}</div>
+          <TopProgressBar active={navLoading}/>
+          <div style={{flex:1,overflow:"hidden",display:"flex",flexDirection:"column"}}>{profileEmp?<EmployeeProfileScreen employee={profileEmp} onClose={()=>setProfileEmpId(null)}/>:<ActiveView/>}</div>
         </main>
         {showActivity&&<ActivityFeed onClose={()=>setShowActivity(false)}/>}
       </div>
