@@ -2532,8 +2532,8 @@ function CommandBar({active,onBack,canBack}){
     }
   })();
   if(groups.length===0) return null;
-  return <div style={{padding:"8px 16px 0 16px",background:"transparent",flexShrink:0}}>
-    <div style={{background:"#fff",borderRadius:22,border:"1px solid #E1E1E2",boxShadow:"0 1px 3px rgba(26,26,26,0.06)",height:46,display:"flex",alignItems:"center",padding:"0 8px",gap:0,overflowX:"auto"}}>
+  return <div style={{padding:"8px 16px 12px 16px",background:"transparent",flexShrink:0}}>
+    <div style={{background:"#fff",borderRadius:4,border:"1px solid #E1E1E2",boxShadow:"0 1px 3px rgba(26,26,26,0.06)",height:46,display:"flex",alignItems:"center",padding:"0 8px",gap:0,overflowX:"auto"}}>
       <button onClick={canBack?onBack:undefined} disabled={!canBack} title={canBack?"Back":"Nothing to go back to"} style={{background:"transparent",border:"none",padding:"0 8px",height:42,cursor:canBack?"pointer":"not-allowed",color:canBack?"#52525B":"#c8c6c4",display:"inline-flex",alignItems:"center",borderRadius:6,opacity:canBack?1:0.5,transition:"background 0.15s"}} onMouseEnter={e=>{if(canBack)e.currentTarget.style.background="#f3f2f1";}} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
         <I as={ArrowLeft20Regular} size={18}/>
       </button>
@@ -2629,8 +2629,8 @@ function TopBar({active,dispatch,state,collapsed,setCollapsed,onCmdPalette,onAct
         placeholder="Search documents, employees, or jump to…"
         style={{width:"100%",padding:"10px 40px 10px 14px",border:"1px solid #E1E1E2",borderRadius:8,fontSize:13,background:"#F8FAFC",color:"#605e5c",cursor:"pointer",boxShadow:"0 1px 3px rgba(0,0,0,0.08)",fontFamily:"inherit",boxSizing:"border-box"}}
       />
-      <div style={{position:"absolute",right:12,top:11,color:"#605e5c",pointerEvents:"none"}}><I as={Search20Regular} size={16}/></div>
-      <kbd style={{position:"absolute",right:38,top:9,fontSize:10,background:"#fff",border:"1px solid #e0dede",borderRadius:3,padding:"2px 5px",color:"#a19f9d",pointerEvents:"none"}}>⌘K</kbd>
+      <div style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",color:"#605e5c",pointerEvents:"none",display:"inline-flex"}}><I as={Search20Regular} size={16}/></div>
+      <kbd style={{position:"absolute",right:38,top:"50%",transform:"translateY(-50%)",fontSize:10,background:"#fff",border:"1px solid #e0dede",borderRadius:3,padding:"2px 5px",color:"#a19f9d",pointerEvents:"none"}}>⌘K</kbd>
     </div>
 
     {/* Right cluster */}
