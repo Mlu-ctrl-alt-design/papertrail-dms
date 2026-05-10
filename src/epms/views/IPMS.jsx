@@ -90,7 +90,11 @@ function PADrawer({ pa, onClose }) {
               </div>
             </div>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12, marginTop: 12 }}>
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+            gap: 12, marginTop: 12,
+          }}>
             <Tile label="Raw weighted score" value={`${score.toFixed(2)} / 5`} accent={C.brand}/>
             <Tile label="Departmental cap" value={`${deptCap.toFixed(2)} / 5`} accent={"#7a5700"}/>
             <Tile label="Moderated score"
@@ -103,7 +107,11 @@ function PADrawer({ pa, onClose }) {
         {/* Weight allocation */}
         <div style={{ marginBottom: 18 }}>
           <SectionTitle>Performance area weights</SectionTitle>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8 }}>
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+            gap: 8,
+          }}>
             {[
               { k: "kpi1", label: "Service delivery" },
               { k: "kpi2", label: "Financial mgmt" },

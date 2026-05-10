@@ -70,7 +70,8 @@ function Step({ n, step, isLast }) {
             {step.metric && (
               <div style={{
                 marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.surfaceMute}`,
-                display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, fontSize: 11,
+                display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
+                gap: 8, fontSize: 11,
               }}>
                 <div>
                   <div style={{ color: C.muted, fontWeight: 600, fontSize: 10,

@@ -65,7 +65,9 @@ function SDBIPDrawer({ target, onClose }) {
             Quarterly cascade
           </div>
           <div style={{
-            display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, marginBottom: 8,
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
+            gap: 8, marginBottom: 8,
           }}>
             {[["Q1", target.q1], ["Q2", target.q2], ["Q3", target.q3], ["Q4", target.q4]].map(([q, v]) => (
               <div key={q} style={{
@@ -84,7 +86,11 @@ function SDBIPDrawer({ target, onClose }) {
           </div>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 18 }}>
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+          gap: 12, marginBottom: 18,
+        }}>
           <Field label="Owner">
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <Avatar userId={target.owner} size={22}/>
@@ -199,7 +205,7 @@ function MSCOATxDrawer({ tx, onClose }) {
             const empty = !v;
             return (
               <div key={s.key} style={{
-                display: "grid", gridTemplateColumns: "200px 1fr",
+                display: "grid", gridTemplateColumns: "minmax(140px, 200px) 1fr",
                 padding: "10px 14px", fontSize: 12,
                 borderBottom: i < segs.length - 1 ? `1px solid ${C.surfaceMute}` : "none",
                 background: empty ? `${C.danger}08` : "#fff",

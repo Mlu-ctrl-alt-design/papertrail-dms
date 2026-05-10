@@ -18,7 +18,9 @@ import {
   Hourglass20Regular, Receipt20Regular, BarcodeScanner20Regular, DocumentArrowUp20Regular,
   PlugConnected20Regular, CloudSync20Regular, CloudArchive20Regular, Database20Regular,
   Money20Regular, Add20Regular, ArrowLeft20Regular,
+  MoreHorizontal20Regular,
 } from "@fluentui/react-icons";
+import { useMaxWidth, BP } from "./components/responsive.jsx";
 
 // ─── Icon Helper ──────────────────────────────────────────────────────────────
 // Fluent icons render with width/height = 1em + fill=currentColor, so size via fontSize
@@ -1351,14 +1353,16 @@ function ColumnFilterPopover({options,selected,onToggle,onClose,onClear}){
 }
 
 // ─── ViewHeader (Fluent 2 page header) ────────────────────────────────────────
+// Wraps the title block + right-side action so they stack instead of squeezing
+// on narrow viewports.
 function ViewHeader({title,subtitle,action,commandView,canBack,onBack}){
   return <Fragment>
-    <div style={{padding:"14px 20px",borderBottom:"1px solid #e1dfdd",background:"#fff",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"space-between",gap:12}}>
-      <div style={{minWidth:0}}>
-        <div style={{fontSize:18,fontWeight:700,color:"#201f1e"}}>{title}</div>
-        {subtitle&&<div style={{fontSize:12,color:"#605e5c",marginTop:1}}>{subtitle}</div>}
+    <div style={{padding:"14px 20px",borderBottom:"1px solid #e1dfdd",background:"#fff",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}>
+      <div style={{flex:"1 1 240px",minWidth:200}}>
+        <div style={{fontSize:18,fontWeight:700,color:"#201f1e",lineHeight:1.25}}>{title}</div>
+        {subtitle&&<div style={{fontSize:12,color:"#605e5c",marginTop:2}}>{subtitle}</div>}
       </div>
-      {action}
+      {action&&<div style={{flexShrink:0}}>{action}</div>}
     </div>
     {commandView&&<CommandBar active={commandView} canBack={!!canBack} onBack={onBack}/>}
   </Fragment>;
@@ -2479,8 +2483,42 @@ function CommandBtn({icon,label,onClick,danger,disabled}){
   </button>;
 }
 function CmdDivider(){return <div style={{width:1,alignSelf:"stretch",background:"#E1E1E2",margin:"0 4px"}}/>;}
+// Click-to-open menu of actions that didn't fit in the truncated bar.
+function CmdOverflowMenu({groups}){
+  const [open,setOpen]=useState(false);
+  const ref=useRef();
+  useEffect(()=>{
+    if(!open)return;
+    const onDoc=(e)=>{if(ref.current&&!ref.current.contains(e.target))setOpen(false);};
+    const onKey=(e)=>{if(e.key==="Escape")setOpen(false);};
+    document.addEventListener("mousedown",onDoc);
+    document.addEventListener("keydown",onKey);
+    return()=>{document.removeEventListener("mousedown",onDoc);document.removeEventListener("keydown",onKey);};
+  },[open]);
+  const total=groups.reduce((a,g)=>a+g.length,0);
+  return <div ref={ref} style={{position:"relative"}}>
+    <button onClick={()=>setOpen(v=>!v)} title={`${total} more action${total===1?"":"s"}`} style={{background:open?"#f3f2f1":"transparent",border:"none",padding:"0 10px",height:42,flexShrink:0,cursor:"pointer",color:"#605e5c",display:"inline-flex",alignItems:"center",gap:4,borderRadius:4,fontFamily:"inherit",fontSize:11,fontWeight:600,transition:"background 0.15s"}} onMouseEnter={e=>{if(!open)e.currentTarget.style.background="#f3f2f1";}} onMouseLeave={e=>{if(!open)e.currentTarget.style.background="transparent";}}>
+      <I as={MoreHorizontal20Regular} size={16}/><span>+{total}</span>
+    </button>
+    {open&&<div className="scale-in" style={{position:"absolute",top:"calc(100% + 6px)",right:0,minWidth:240,background:"#fff",border:"1px solid #e1dfdd",borderRadius:4,boxShadow:"0 12px 32px rgba(0,0,0,0.18)",zIndex:1500,padding:4,overflow:"hidden"}}>
+      {groups.map((items,gi)=>(
+        <Fragment key={"og"+gi}>
+          {gi>0&&<div style={{height:1,background:"#f3f2f1",margin:"4px 0"}}/>}
+          {items.map((item,ii)=>(
+            <button key={"og"+gi+"-"+ii} onClick={()=>{if(!item.disabled&&item.onClick)item.onClick();setOpen(false);}} disabled={item.disabled} style={{width:"100%",textAlign:"left",background:"transparent",border:"none",padding:"8px 10px",borderRadius:4,cursor:item.disabled?"not-allowed":"pointer",color:item.disabled?"#a19f9d":item.danger?"#a4262c":"#323130",display:"flex",alignItems:"center",gap:10,fontSize:13,fontFamily:"inherit",opacity:item.disabled?0.6:1}} onMouseEnter={e=>{if(!item.disabled)e.currentTarget.style.background=item.danger?"#fde7e9":"#f3f2f1";}} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+              {item.icon&&<I as={item.icon} size={15} color={item.danger?"#a4262c":"#605e5c"}/>}
+              <span style={{flex:1}}>{item.label}</span>
+            </button>
+          ))}
+        </Fragment>
+      ))}
+    </div>}
+  </div>;
+}
 function CommandBar({active,onBack,canBack}){
   const toast=useToast();
+  const isMd=useMaxWidth(BP.md);
+  const isLg=useMaxWidth(BP.lg);
   const flash=(label)=>toast(label,"Command queued",{icon:<I as={Info20Regular} size={16} color="#219CD6"/>,color:"#219CD6"});
   const groups=(()=>{
     switch(active){
@@ -2532,26 +2570,38 @@ function CommandBar({active,onBack,canBack}){
     }
   })();
   if(groups.length===0) return null;
+  // Progressive truncation:
+  //   ≥ lg → all groups visible
+  //   < lg → drop right-side groups (typically Exports)
+  //   < md → also drop secondary left groups (keep only primary)
+  // Anything dropped lives in a click-to-open overflow menu so it stays reachable.
+  const allLeft=groups.filter(g=>!g[0]?.right);
+  const allRight=groups.filter(g=>g[0]?.right);
+  const left=isMd?allLeft.slice(0,1):allLeft;
+  const right=isLg?[]:allRight;
+  const overflowGroups=[...allLeft.slice(left.length),...(isLg?allRight:[])];
   return <div style={{padding:"8px 16px 12px 16px",background:"transparent",flexShrink:0}}>
-    <div style={{background:"#fff",borderRadius:4,border:"1px solid #E1E1E2",boxShadow:"0 1px 3px rgba(26,26,26,0.06)",height:46,display:"flex",alignItems:"center",padding:"0 8px",gap:0,overflowX:"auto"}}>
-      <button onClick={canBack?onBack:undefined} disabled={!canBack} title={canBack?"Back":"Nothing to go back to"} style={{background:"transparent",border:"none",padding:"0 8px",height:42,cursor:canBack?"pointer":"not-allowed",color:canBack?"#52525B":"#c8c6c4",display:"inline-flex",alignItems:"center",borderRadius:6,opacity:canBack?1:0.5,transition:"background 0.15s"}} onMouseEnter={e=>{if(canBack)e.currentTarget.style.background="#f3f2f1";}} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+    <div style={{background:"#fff",borderRadius:4,border:"1px solid #E1E1E2",boxShadow:"0 1px 3px rgba(26,26,26,0.06)",height:46,display:"flex",alignItems:"center",padding:"0 8px",gap:0,overflow:"visible"}}>
+      <button onClick={canBack?onBack:undefined} disabled={!canBack} title={canBack?"Back":"Nothing to go back to"} style={{background:"transparent",border:"none",padding:"0 8px",height:42,flexShrink:0,cursor:canBack?"pointer":"not-allowed",color:canBack?"#52525B":"#c8c6c4",display:"inline-flex",alignItems:"center",borderRadius:6,opacity:canBack?1:0.5,transition:"background 0.15s"}} onMouseEnter={e=>{if(canBack)e.currentTarget.style.background="#f3f2f1";}} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
         <I as={ArrowLeft20Regular} size={18}/>
       </button>
       <CmdDivider/>
-      {groups.filter(g=>!g[0]?.right).map((items,gi)=>(
-        <Fragment key={"l"+gi}>
-          {gi>0&&<CmdDivider/>}
-          {items.map((item,ii)=><CommandBtn key={"l"+gi+"-"+ii} {...item}/>)}
-        </Fragment>
-      ))}
-      <div style={{flex:1}}/>
-      {groups.filter(g=>g[0]?.right).map((items,gi)=>(
+      <div style={{display:"flex",alignItems:"center",flex:1,minWidth:0,overflow:"hidden"}}>
+        {left.map((items,gi)=>(
+          <Fragment key={"l"+gi}>
+            {gi>0&&<CmdDivider/>}
+            {items.map((item,ii)=><CommandBtn key={"l"+gi+"-"+ii} {...item}/>)}
+          </Fragment>
+        ))}
+      </div>
+      {right.map((items,gi)=>(
         <Fragment key={"r"+gi}>
           {gi>0&&<CmdDivider/>}
           <CmdDivider/>
           {items.map((item,ii)=><CommandBtn key={"r"+gi+"-"+ii} {...item}/>)}
         </Fragment>
       ))}
+      {overflowGroups.length>0&&<><CmdDivider/><CmdOverflowMenu groups={overflowGroups}/></>}
     </div>
   </div>;
 }
@@ -2591,11 +2641,17 @@ function Sidebar({active,setActive,collapsed,setCollapsed}){
 }
 
 // ─── Top Bar ──────────────────────────────────────────────────────────────────
+// Three responsive tiers:
+//   ≥ md → full layout (logo, full search input, Quick Add label)
+//   < md → tighter padding/gap, Quick Add icon-only
+//   < sm → search collapses to an icon button that opens the palette
 function TopBar({active,dispatch,state,collapsed,setCollapsed,onCmdPalette,onActivity,setActive}){
   const [showNotif,setShowNotif]=useState(false);
   const [showQuickAdd,setShowQuickAdd]=useState(false);
   const [showUserMenu,setShowUserMenu]=useState(false);
   const qaRef=useRef(),umRef=useRef();
+  const compactSearch=useMaxWidth(BP.sm);
+  const tightPadding=useMaxWidth(BP.md);
   useEffect(()=>{
     const h=(e)=>{
       if(showQuickAdd&&qaRef.current&&!qaRef.current.contains(e.target)) setShowQuickAdd(false);
@@ -2613,7 +2669,7 @@ function TopBar({active,dispatch,state,collapsed,setCollapsed,onCmdPalette,onAct
     {label:"New workflow",sub:"Approval chain",icon:Share20Regular,action:()=>setActive("workflow")},
   ];
   const iconBtnStyle={background:"transparent",border:"1px solid rgba(255,255,255,0.28)",borderRadius:8,padding:"7px 9px",cursor:"pointer",color:"#fff",display:"inline-flex",alignItems:"center",fontFamily:"inherit",position:"relative",transition:"background 0.15s"};
-  return <div style={{padding:"10px 18px",borderBottom:"2px solid #1D4FD7",background:"#219CD6",display:"flex",alignItems:"center",gap:14,flexShrink:0,position:"relative",zIndex:100,minHeight:64,boxSizing:"border-box"}}>
+  return <div style={{padding:tightPadding?"8px 12px":"10px 18px",borderBottom:"2px solid #1D4FD7",background:"#219CD6",display:"flex",alignItems:"center",gap:tightPadding?8:14,flexShrink:0,position:"relative",zIndex:100,minHeight:64,boxSizing:"border-box"}}>
     {/* Sidebar toggle */}
     <button onClick={()=>setCollapsed(c=>!c)} title={collapsed?"Expand sidebar":"Collapse sidebar"} style={{background:"transparent",border:"1px solid rgba(255,255,255,0.28)",borderRadius:8,padding:"7px 9px",cursor:"pointer",color:"#fff",display:"inline-flex",alignItems:"center",fontFamily:"inherit",flexShrink:0}} onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,0.12)"} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
       <I as={LineHorizontal320Regular} size={16}/>
@@ -2621,24 +2677,30 @@ function TopBar({active,dispatch,state,collapsed,setCollapsed,onCmdPalette,onAct
     {/* Logo */}
     <img src="/logo.svg" alt="Ezra360 DMS" style={{height:32,filter:"brightness(0) invert(1)",flexShrink:0}}/>
 
-    {/* Search input — opens command palette */}
-    <div style={{flex:1,maxWidth:560,position:"relative",margin:"0 auto"}}>
-      <input
-        readOnly
-        onClick={onCmdPalette}
-        placeholder="Search documents, employees, or jump to…"
-        style={{width:"100%",padding:"10px 40px 10px 14px",border:"1px solid #E1E1E2",borderRadius:8,fontSize:13,background:"#F8FAFC",color:"#605e5c",cursor:"pointer",boxShadow:"0 1px 3px rgba(0,0,0,0.08)",fontFamily:"inherit",boxSizing:"border-box"}}
-      />
-      <div style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",color:"#605e5c",pointerEvents:"none",display:"inline-flex"}}><I as={Search20Regular} size={16}/></div>
-      <kbd style={{position:"absolute",right:38,top:"50%",transform:"translateY(-50%)",fontSize:10,background:"#fff",border:"1px solid #e0dede",borderRadius:3,padding:"2px 5px",color:"#a19f9d",pointerEvents:"none"}}>⌘K</kbd>
-    </div>
+    {/* Search — full input ≥ sm, icon-only button below */}
+    {compactSearch ? (
+      <button onClick={onCmdPalette} title="Search (⌘K)" style={{marginLeft:"auto",background:"rgba(255,255,255,0.12)",border:"1px solid rgba(255,255,255,0.28)",borderRadius:8,padding:"7px 9px",cursor:"pointer",color:"#fff",display:"inline-flex",alignItems:"center",fontFamily:"inherit",flexShrink:0}} onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,0.22)"} onMouseLeave={e=>e.currentTarget.style.background="rgba(255,255,255,0.12)"}>
+        <I as={Search20Regular} size={16}/>
+      </button>
+    ) : (
+      <div style={{flex:1,maxWidth:560,position:"relative",margin:"0 auto",minWidth:0}}>
+        <input
+          readOnly
+          onClick={onCmdPalette}
+          placeholder="Search documents, employees, or jump to…"
+          style={{width:"100%",padding:"10px 40px 10px 14px",border:"1px solid #E1E1E2",borderRadius:8,fontSize:13,background:"#F8FAFC",color:"#605e5c",cursor:"pointer",boxShadow:"0 1px 3px rgba(0,0,0,0.08)",fontFamily:"inherit",boxSizing:"border-box"}}
+        />
+        <div style={{position:"absolute",right:12,top:"50%",transform:"translateY(-50%)",color:"#605e5c",pointerEvents:"none",display:"inline-flex"}}><I as={Search20Regular} size={16}/></div>
+        <kbd style={{position:"absolute",right:38,top:"50%",transform:"translateY(-50%)",fontSize:10,background:"#fff",border:"1px solid #e0dede",borderRadius:3,padding:"2px 5px",color:"#a19f9d",pointerEvents:"none"}}>⌘K</kbd>
+      </div>
+    )}
 
     {/* Right cluster */}
-    <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
+    <div style={{display:"flex",alignItems:"center",gap:tightPadding?6:8,flexShrink:0}}>
       {/* Quick add */}
       <div ref={qaRef} style={{position:"relative"}}>
-        <button onClick={()=>setShowQuickAdd(v=>!v)} style={{background:"#1D4FD7",border:"none",borderRadius:8,padding:"8px 14px",cursor:"pointer",color:"#fff",fontSize:13,fontWeight:600,display:"inline-flex",alignItems:"center",gap:6,fontFamily:"inherit",whiteSpace:"nowrap"}}>
-          <I as={Add20Regular} size={14}/> Quick add <I as={ChevronDown20Regular} size={14} style={{transform:showQuickAdd?"rotate(180deg)":"none",transition:"transform 0.15s"}}/>
+        <button onClick={()=>setShowQuickAdd(v=>!v)} title="Quick add" style={{background:"#1D4FD7",border:"none",borderRadius:8,padding:tightPadding?"8px 10px":"8px 14px",cursor:"pointer",color:"#fff",fontSize:13,fontWeight:600,display:"inline-flex",alignItems:"center",gap:6,fontFamily:"inherit",whiteSpace:"nowrap"}}>
+          <I as={Add20Regular} size={14}/>{!tightPadding&&<> Quick add</>} <I as={ChevronDown20Regular} size={14} style={{transform:showQuickAdd?"rotate(180deg)":"none",transition:"transform 0.15s"}}/>
         </button>
         {showQuickAdd&&<div className="scale-in" style={{position:"absolute",right:0,top:"calc(100% + 8px)",width:280,background:"#fff",border:"1px solid #e1dfdd",borderRadius:6,boxShadow:"0 12px 32px rgba(0,0,0,0.18)",zIndex:1000,padding:6}}>
           {quickAddItems.map(q=>(
@@ -2703,7 +2765,9 @@ function TopBar({active,dispatch,state,collapsed,setCollapsed,onCmdPalette,onAct
 export default function App(){
   const [state,dispatch]=useReducer(appReducer,initialState);
   const [active,setActive]=useState("docs");
-  const [collapsed,setCollapsed]=useState(false);
+  const isNarrow=useMaxWidth(BP.lg);
+  const [collapsed,setCollapsed]=useState(isNarrow);
+  useEffect(()=>{setCollapsed(isNarrow);},[isNarrow]);
   const [showCmd,setShowCmd]=useState(false);
   const [showActivity,setShowActivity]=useState(false);
 

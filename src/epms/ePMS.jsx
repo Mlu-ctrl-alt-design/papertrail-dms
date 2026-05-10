@@ -12,7 +12,7 @@ import {
 import {
   GlobalStyles, ToastProvider, Sidebar, TopBar, TopBarIconBtn, AppShellRoot,
   TopProgressBar, AvatarChip,
-  I, C,
+  I, C, useMaxWidth, BP,
 } from "../components/index.js";
 import { EPMSContext } from "./state.js";
 import { useEPMSStore } from "./state.js";
@@ -45,18 +45,22 @@ const VIEWS = {
 };
 
 function Brand() {
+  const compact = useMaxWidth(BP.md);
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0, minWidth: 0 }}>
       <img src="/logo.svg" alt="Ezra mSCOA"
            style={{ height: 32, filter: "brightness(0) invert(1)", flexShrink: 0 }}/>
-      <div style={{ display: "flex", flexDirection: "column", lineHeight: 1.1 }}>
-        <span style={{ color: "#fff", fontSize: 13, fontWeight: 700, letterSpacing: "0.2px" }}>
-          Ezra <span style={{ opacity: 0.85, fontWeight: 600 }}>mSCOA</span>
-        </span>
-        <span style={{ color: "rgba(255,255,255,0.78)", fontSize: 10, fontWeight: 600 }}>
-          {MUNICIPALITY.code} · {MUNICIPALITY.name}
-        </span>
-      </div>
+      {!compact && (
+        <div style={{ display: "flex", flexDirection: "column", lineHeight: 1.1, minWidth: 0 }}>
+          <span style={{ color: "#fff", fontSize: 13, fontWeight: 700, letterSpacing: "0.2px" }}>
+            Ezra <span style={{ opacity: 0.85, fontWeight: 600 }}>mSCOA</span>
+          </span>
+          <span style={{ color: "rgba(255,255,255,0.78)", fontSize: 10, fontWeight: 600,
+                         overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {MUNICIPALITY.code} · {MUNICIPALITY.name}
+          </span>
+        </div>
+      )}
     </div>
   );
 }
@@ -67,6 +71,7 @@ function Brand() {
 function PersonaSwitcher({ setActive }) {
   const { state, dispatch } = useContext(EPMSContext);
   const me = state.currentUser;
+  const compact = useMaxWidth(BP.md);
   const [open, setOpen] = useState(false);
   const ref = useRef();
   useEffect(() => {
@@ -82,11 +87,11 @@ function PersonaSwitcher({ setActive }) {
   };
   return (
     <div ref={ref} style={{ position: "relative" }}>
-      <button onClick={() => setOpen((v) => !v)} title="Switch persona (demo)" style={{
+      <button onClick={() => setOpen((v) => !v)} title={`Switch persona — current: ${me.name} (${me.role})`} style={{
         background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.28)",
-        borderRadius: 100, padding: "4px 10px 4px 4px",
+        borderRadius: 100, padding: compact ? "3px 6px 3px 3px" : "4px 10px 4px 4px",
         cursor: "pointer", color: "#fff",
-        display: "inline-flex", alignItems: "center", gap: 8,
+        display: "inline-flex", alignItems: "center", gap: compact ? 4 : 8,
         fontFamily: "inherit", whiteSpace: "nowrap",
       }}>
         <div style={{
@@ -94,11 +99,13 @@ function PersonaSwitcher({ setActive }) {
           color: "#fff", display: "grid", placeItems: "center",
           fontSize: 12, fontWeight: 700, border: "2px solid #fff",
         }}>{me.initials}</div>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start",
-                      lineHeight: 1.1, padding: "2px 0" }}>
-          <span style={{ fontSize: 12, fontWeight: 700 }}>{me.initials} · {me.name.split(" ").slice(-1)[0]}</span>
-          <span style={{ fontSize: 9, opacity: 0.82, fontWeight: 600 }}>{me.role}</span>
-        </div>
+        {!compact && (
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start",
+                        lineHeight: 1.1, padding: "2px 0" }}>
+            <span style={{ fontSize: 12, fontWeight: 700 }}>{me.initials} · {me.name.split(" ").slice(-1)[0]}</span>
+            <span style={{ fontSize: 9, opacity: 0.82, fontWeight: 600 }}>{me.role}</span>
+          </div>
+        )}
         <I as={ChevronDown20Regular} size={14}
            style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 0.15s" }}/>
       </button>
@@ -213,6 +220,7 @@ function NotificationsBell() {
 }
 
 function QuickAdd({ setActive }) {
+  const compact = useMaxWidth(BP.md);
   const [open, setOpen] = useState(false);
   const ref = useRef();
   useEffect(() => {
@@ -230,14 +238,15 @@ function QuickAdd({ setActive }) {
   ];
   return (
     <div ref={ref} style={{ position: "relative" }}>
-      <button onClick={() => setOpen((v) => !v)} style={{
+      <button onClick={() => setOpen((v) => !v)} title="Quick add" style={{
         background: C.brandDark, border: "none", borderRadius: 4,
-        padding: "8px 14px", cursor: "pointer", color: "#fff",
+        padding: compact ? "8px 10px" : "8px 14px", cursor: "pointer", color: "#fff",
         fontSize: 13, fontWeight: 600,
         display: "inline-flex", alignItems: "center", gap: 6,
         fontFamily: "inherit", whiteSpace: "nowrap",
       }}>
-        <I as={Add20Regular} size={14}/> Quick add{" "}
+        <I as={Add20Regular} size={14}/>
+        {!compact && <>Quick add{" "}</>}
         <I as={ChevronDown20Regular} size={14}
            style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 0.15s" }}/>
       </button>
@@ -383,7 +392,10 @@ function ComplianceStatusFooter({ collapsed }) {
 function ShellInner() {
   const [storeState, dispatch] = useEPMSStore();
   const [active, setActive] = useState("dashboard");
-  const [collapsed, setCollapsed] = useState(false);
+  const isNarrow = useMaxWidth(BP.lg);
+  // Sidebar auto-collapses on narrow viewports; user can still toggle.
+  const [collapsed, setCollapsed] = useState(isNarrow);
+  useEffect(() => { setCollapsed(isNarrow); }, [isNarrow]);
   const [showCmd, setShowCmd] = useState(false);
   const [navLoading, setNavLoading] = useState(false);
 

@@ -89,10 +89,10 @@ function KPABar({ kpa, value, status }) {
         <span style={{ fontSize: 11, fontWeight: 700, color: C.text }}>{kpa.code}</span>
         <span style={{ fontSize: 13, fontWeight: 700, color: c }}>{value}%</span>
       </div>
-      <div style={{ height: 8, background: C.surfaceMute, borderRadius: 40, overflow: "hidden" }}>
+      <div style={{ height: 8, background: C.surfaceMute, borderRadius: 100, overflow: "hidden" }}>
         <div style={{
           height: "100%", width: `${value}%`,
-          background: c, borderRadius: 40, transition: "width 0.5s ease",
+          background: c, borderRadius: 100, transition: "width 0.5s ease",
         }}/>
       </div>
       <div style={{ fontSize: 10, color: C.faint, marginTop: 4 }}>{kpa.label}</div>
@@ -207,9 +207,10 @@ export function DashboardView({ setActive }) {
           </div>
         )}
 
-        {/* Stats row — script-defined four headline numbers */}
+        {/* Stats row — script-defined four headline numbers (auto-wraps below ~900px) */}
         <div style={{
-          display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 22,
+          display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+          gap: 14, marginBottom: 22,
         }}>
           <StatCard icon={DataHistogram20Regular} label="Top-Layer SDBIP YTD"
                     value={`${TOP_LAYER_SDBIP_YTD}%`}
@@ -228,8 +229,12 @@ export function DashboardView({ setActive }) {
                     color={C.success} accent/>
         </div>
 
-        {/* KPA panel + Q3 trend */}
-        <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: 18, marginBottom: 22 }}>
+        {/* KPA panel + Q3 trend (stacks on narrow) */}
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(380px, 1fr))",
+          gap: 18, marginBottom: 22,
+        }}>
           <div style={{
             background: "#fff", border: "1px solid rgba(0,0,0,0.07)",
             borderRadius: 4, padding: "18px 20px",
@@ -295,24 +300,26 @@ export function DashboardView({ setActive }) {
               const pct = Math.round((it.actual / it.target) * 100);
               return (
                 <div key={it.id} onClick={() => onAttentionClick(it)} className="fade-up" style={{
-                  display: "grid", gridTemplateColumns: "100px 1fr 200px 110px 60px",
-                  gap: 14, padding: "12px 20px", alignItems: "center",
+                  display: "flex", alignItems: "center", gap: 14,
+                  padding: "12px 20px", flexWrap: "wrap",
                   borderBottom: i < ATTENTION.length - 1 ? `1px solid ${C.surfaceMute}` : "none",
                   cursor: "pointer", transition: "background 0.15s",
                   animationDelay: `${i * 0.04}s`,
                 }}
                 onMouseEnter={(e) => (e.currentTarget.style.background = C.surfaceAlt)}
                 onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: C.muted, fontFamily: "ui-monospace, monospace" }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: C.muted,
+                                fontFamily: "ui-monospace, monospace",
+                                width: 90, flexShrink: 0 }}>
                     {it.code}
                   </div>
-                  <div style={{ minWidth: 0 }}>
+                  <div style={{ flex: "2 1 240px", minWidth: 200 }}>
                     <div style={{ fontSize: 12, fontWeight: 600, color: C.ink, lineHeight: 1.35,
-                                  display: "flex", alignItems: "center", gap: 8 }}>
+                                  display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                       {it.title}
                       {it.cascade && (
                         <span style={{
-                          fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 40,
+                          fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 100,
                           background: C.brandTint, color: C.brand,
                           textTransform: "uppercase", letterSpacing: "0.5px",
                         }}>5-step cascade</span>
@@ -324,20 +331,21 @@ export function DashboardView({ setActive }) {
                       </div>
                     )}
                   </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <div style={{ flex: 1, height: 5, background: C.surfaceMute, borderRadius: 40, overflow: "hidden" }}>
-                      <div style={{ height: "100%", width: `${Math.min(100, pct)}%`, background: c, borderRadius: 40 }}/>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8,
+                                flex: "1 1 180px", minWidth: 160 }}>
+                    <div style={{ flex: 1, height: 5, background: C.surfaceMute, borderRadius: 100, overflow: "hidden" }}>
+                      <div style={{ height: "100%", width: `${Math.min(100, pct)}%`, background: c, borderRadius: 100 }}/>
                     </div>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: c, minWidth: 56, textAlign: "right" }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: c, minWidth: 76, textAlign: "right" }}>
                       {it.actual}% / {it.target}%
                     </span>
                   </div>
-                  <div>
+                  <div style={{ flexShrink: 0 }}>
                     <Pill bg={`${c}1f`} fg={c}>
                       {it.status === "red" ? "Red" : it.status === "amber" ? "Amber" : "Green"}
                     </Pill>
                   </div>
-                  <div style={{ textAlign: "right", color: C.faint }}>
+                  <div style={{ flexShrink: 0, color: C.faint, marginLeft: "auto" }}>
                     <I as={ChevronRight20Regular} size={14}/>
                   </div>
                 </div>
@@ -346,8 +354,12 @@ export function DashboardView({ setActive }) {
           </div>
         </div>
 
-        {/* Compliance + Activity row */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
+        {/* Compliance + Activity row (stacks on narrow) */}
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))",
+          gap: 18,
+        }}>
           <div style={{
             background: "#fff", border: "1px solid rgba(0,0,0,0.07)",
             borderRadius: 4, padding: "18px 20px",

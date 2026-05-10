@@ -5,6 +5,7 @@ import { LineHorizontal320Regular, Search20Regular } from "@fluentui/react-icons
 import { I } from "./Icon.jsx";
 import { Badge } from "./primitives.jsx";
 import { C } from "./tokens.js";
+import { useMaxWidth, BP } from "./responsive.jsx";
 
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
 // nav items: { id, label, icon (ReactNode), badge?: number }
@@ -89,16 +90,22 @@ export function TopBarIconBtn({ onClick, title, children, badge }) {
 //   right:  ReactNode for the right cluster (quick-add, notif, user menu…)
 //   accent: top bar background (default brand)
 //   accentDark: subtle bottom border colour (default brandDark)
+//
+// Below sm (640px) the full search input collapses to an icon button that
+// also opens the command palette — keeps the bar usable on phones.
 export function TopBar({
   brand, onToggleSidebar, onCmdPalette,
   searchPlaceholder = "Search…", right,
   accent = C.brand, accentDark = C.brandDark,
 }) {
+  const compactSearch = useMaxWidth(BP.sm);
+  const tightPadding  = useMaxWidth(BP.md);
   return (
     <div style={{
-      padding: "10px 18px", borderBottom: `2px solid ${accentDark}`,
+      padding: tightPadding ? "8px 12px" : "10px 18px",
+      borderBottom: `2px solid ${accentDark}`,
       background: accent, display: "flex", alignItems: "center",
-      gap: 14, flexShrink: 0, position: "relative", zIndex: 100,
+      gap: tightPadding ? 8 : 14, flexShrink: 0, position: "relative", zIndex: 100,
       minHeight: 64, boxSizing: "border-box",
     }}>
       <button onClick={onToggleSidebar} title="Toggle sidebar" style={{
@@ -112,31 +119,48 @@ export function TopBar({
         <I as={LineHorizontal320Regular} size={16}/>
       </button>
       {brand}
-      <div style={{ flex: 1, maxWidth: 560, position: "relative", margin: "0 auto" }}>
-        <input
-          readOnly
-          onClick={onCmdPalette}
-          placeholder={searchPlaceholder}
-          style={{
-            width: "100%", padding: "10px 40px 10px 14px",
-            border: "1px solid #E1E1E2", borderRadius: 4,
-            fontSize: 13, background: "#F8FAFC", color: C.muted,
-            cursor: "pointer", boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
-            fontFamily: "inherit", boxSizing: "border-box",
-          }} />
-        <div style={{
-          position: "absolute", right: 12, top: "50%",
-          transform: "translateY(-50%)", color: C.muted,
-          pointerEvents: "none", display: "inline-flex",
-        }}><I as={Search20Regular} size={16}/></div>
-        <kbd style={{
-          position: "absolute", right: 38, top: "50%",
-          transform: "translateY(-50%)", fontSize: 10, background: "#fff",
-          border: `1px solid ${C.hairlineSoft}`, borderRadius: 3,
-          padding: "2px 5px", color: C.faint, pointerEvents: "none",
-        }}>⌘K</kbd>
-      </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+      {compactSearch ? (
+        // Icon-only search trigger — opens the same command palette.
+        <button onClick={onCmdPalette} title="Search (⌘K)" style={{
+          marginLeft: "auto",
+          background: "rgba(255,255,255,0.12)",
+          border: "1px solid rgba(255,255,255,0.28)",
+          borderRadius: 4, padding: "7px 9px", cursor: "pointer", color: "#fff",
+          display: "inline-flex", alignItems: "center",
+          fontFamily: "inherit", flexShrink: 0,
+        }}
+        onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.22)"}
+        onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,0.12)"}>
+          <I as={Search20Regular} size={16}/>
+        </button>
+      ) : (
+        <div style={{ flex: 1, maxWidth: 560, position: "relative", margin: "0 auto", minWidth: 0 }}>
+          <input
+            readOnly
+            onClick={onCmdPalette}
+            placeholder={searchPlaceholder}
+            style={{
+              width: "100%", padding: "10px 40px 10px 14px",
+              border: "1px solid #E1E1E2", borderRadius: 4,
+              fontSize: 13, background: "#F8FAFC", color: C.muted,
+              cursor: "pointer", boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+              fontFamily: "inherit", boxSizing: "border-box",
+            }} />
+          <div style={{
+            position: "absolute", right: 12, top: "50%",
+            transform: "translateY(-50%)", color: C.muted,
+            pointerEvents: "none", display: "inline-flex",
+          }}><I as={Search20Regular} size={16}/></div>
+          <kbd style={{
+            position: "absolute", right: 38, top: "50%",
+            transform: "translateY(-50%)", fontSize: 10, background: "#fff",
+            border: `1px solid ${C.hairlineSoft}`, borderRadius: 3,
+            padding: "2px 5px", color: C.faint, pointerEvents: "none",
+          }}>⌘K</kbd>
+        </div>
+      )}
+      <div style={{ display: "flex", alignItems: "center",
+                    gap: tightPadding ? 6 : 8, flexShrink: 0 }}>
         {right}
       </div>
     </div>

@@ -85,7 +85,11 @@ function POEDrawer({ doc, onClose }) {
           </div>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 18 }}>
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+          gap: 12, marginBottom: 18,
+        }}>
           <Field label="Uploaded by">
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <Avatar userId={doc.uploader} size={22}/>

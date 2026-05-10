@@ -47,7 +47,11 @@ function ObjectiveDrawer({ objective, onClose }) {
         </div>
       </div>
       <div style={{ flex: 1, overflow: "auto", padding: "18px 22px" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 18 }}>
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+          gap: 12, marginBottom: 18,
+        }}>
           <Field label="Owner">
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <Avatar userId={objective.owner} size={24}/>
