@@ -21,6 +21,7 @@ import { daysFrom } from "./helpers.js";
 
 import { DashboardView } from "./views/Dashboard.jsx";
 import { IDPView } from "./views/IDP.jsx";
+import { RiskRegisterView } from "./views/RiskRegister.jsx";
 import { SDBIPView } from "./views/SDBIP.jsx";
 import { IPMSView } from "./views/IPMS.jsx";
 import { POEView } from "./views/POE.jsx";
@@ -28,7 +29,8 @@ import { AuditView } from "./views/Audit.jsx";
 
 const NAV = [
   { id: "dashboard", label: "Dashboard",        icon: Home20Regular },
-  { id: "idp",       label: "IDP & Risk",        icon: Flag20Regular },
+  { id: "idp",       label: "IDP",              icon: Flag20Regular },
+  { id: "risk",      label: "Risk Register",    icon: ShieldLock20Regular },
   { id: "sdbip",     label: "SDBIP & mSCOA",     icon: DataHistogram20Regular },
   { id: "ipms",      label: "IPMS",              icon: ContactCard20Regular },
   { id: "poe",       label: "POE Vault",         icon: Document20Regular },
@@ -38,6 +40,7 @@ const NAV = [
 const VIEWS = {
   dashboard: DashboardView,
   idp:       IDPView,
+  risk:      RiskRegisterView,
   sdbip:     SDBIPView,
   ipms:      IPMSView,
   poe:       POEView,

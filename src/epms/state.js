@@ -4,6 +4,7 @@
 import { createContext, useReducer } from "react";
 import {
   STRATEGIC_OBJECTIVES, STRATEGIC_RISKS,
+  PERFORMANCE_OBJECTIVES, MASTER_KPIS,
   SDBIP_TARGETS, MSCOA_TRANSACTIONS, CAPITAL_PROJECTS,
   PERFORMANCE_AGREEMENTS, INDIVIDUAL_KPIS,
   POE_DOCUMENTS, COMPLIANCE_DEADLINES, ACTIVITY,
@@ -14,6 +15,8 @@ export const EPMSContext = createContext(null);
 
 export const initialState = {
   objectives: STRATEGIC_OBJECTIVES,
+  performanceObjectives: PERFORMANCE_OBJECTIVES,
+  masterKpis: MASTER_KPIS,
   risks: STRATEGIC_RISKS,
   sdbipTargets: SDBIP_TARGETS,
   mscoaTx: MSCOA_TRANSACTIONS,
@@ -81,6 +84,38 @@ export function epmsReducer(state, action) {
         ...state,
         performanceAgreements: [action.pa, ...state.performanceAgreements],
       }, { userId: state.currentUser.id, action: "Created PA", target: action.pa.employee });
+
+    case "ADD_SO":
+      return logActivity({
+        ...state,
+        objectives: [action.so, ...state.objectives],
+      }, { userId: state.currentUser.id, action: "Created Strategic Objective", target: action.so.code });
+
+    case "ADD_PO":
+      return logActivity({
+        ...state,
+        performanceObjectives: [action.po, ...state.performanceObjectives],
+      }, { userId: state.currentUser.id, action: "Created Performance Objective", target: action.po.code });
+
+    case "ADD_KPI":
+      return logActivity({
+        ...state,
+        masterKpis: [action.kpi, ...state.masterKpis],
+      }, { userId: state.currentUser.id, action: "Created Master KPI", target: action.kpi.code });
+
+    // Roll-forward: clone the selected Master KPIs to a target fiscal year.
+    // Used at FY changeover to preserve mappings (Munsoft 7.3.2 §E "Copy KPIs").
+    case "COPY_KPIS_FY": {
+      const clones = action.ids.map((id) => {
+        const src = state.masterKpis.find((k) => k.id === id);
+        if (!src) return null;
+        return { ...src, id: `kpi_${Date.now()}_${src.code.replace(/\s+/g, "")}`, fy: action.targetFy };
+      }).filter(Boolean);
+      return logActivity({
+        ...state,
+        masterKpis: [...clones, ...state.masterKpis],
+      }, { userId: state.currentUser.id, action: `Rolled ${clones.length} KPIs → ${action.targetFy}`, target: action.targetFy });
+    }
 
     case "MARK_COMPLIANCE":
       return logActivity({

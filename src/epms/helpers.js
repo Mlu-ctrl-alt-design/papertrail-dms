@@ -63,3 +63,31 @@ export const weightedScore = (kpis) => {
   const sum = kpis.reduce((acc, k) => acc + (k.weight * k.rating), 0);
   return sum / 100;
 };
+
+// ─── IDP balance helpers ──────────────────────────────────────────────────────
+// Total weight allocated to a KPA (sum of SO weights).
+export const kpaWeight = (kpaId, objectives, excludeSoId = null) =>
+  objectives
+    .filter((o) => o.kpaId === kpaId && o.id !== excludeSoId)
+    .reduce((acc, o) => acc + (o.weight || 0), 0);
+
+// Total weight allocated under one SO (sum of PO weights).
+export const soWeight = (soId, performanceObjectives, excludePoId = null) =>
+  performanceObjectives
+    .filter((p) => p.soId === soId && p.id !== excludePoId)
+    .reduce((acc, p) => acc + (p.weight || 0), 0);
+
+// Per-KPA band status — used by the KPABalanceBar and form validators.
+// Returns { kpaId, current, band, projected, state, deltaText }.
+//   state: "over" (hard) | "under" (soft) | "ok" | "untargeted"
+//   projected = current after the simulated change
+export const kpaBandStatus = (kpaId, objectives, bands, simulated = 0, excludeSoId = null) => {
+  const band = bands?.[kpaId];
+  const current = kpaWeight(kpaId, objectives, excludeSoId);
+  const projected = current + simulated;
+  if (!band) return { kpaId, current, projected, band: null, state: "untargeted", deltaText: "" };
+  let state = "ok";
+  if (projected > band.max) state = "over";
+  else if (projected < band.min) state = "under";
+  return { kpaId, current, projected, band, state, deltaText: `${current}% → ${projected}%` };
+};
