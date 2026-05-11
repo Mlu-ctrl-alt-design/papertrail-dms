@@ -9,7 +9,7 @@ import {
   Warning20Regular,
 } from "@fluentui/react-icons";
 import {
-  I, C, Btn, Pill, Drawer, Modal, DataTable,
+  I, C, Btn, Pill, Drawer, FormDrawer, DataTable,
   ViewHeader, CommandBar, Input, Select, useToast,
 } from "../../components/index.js";
 import { EPMSContext } from "../state.js";
@@ -148,7 +148,7 @@ function Field({ label, children }) {
   );
 }
 
-function UploadModal({ onClose }) {
+function UploadPanel({ onClose }) {
   const { state, dispatch } = useContext(EPMSContext);
   const toast = useToast();
   const [title, setTitle] = useState("");
@@ -182,7 +182,11 @@ function UploadModal({ onClose }) {
     onClose();
   };
   return (
-    <Modal title="Upload Portfolio of Evidence" onClose={onClose} width={520}>
+    <FormDrawer title="Upload Portfolio of Evidence" onClose={onClose} width={520}
+                footer={<>
+                  <Btn variant="secondary" onClick={onClose}>Cancel</Btn>
+                  <Btn onClick={submit}><I as={Fingerprint20Regular} size={14}/> Hash & Upload</Btn>
+                </>}>
       <div style={{ padding: 20 }}>
         <div style={{
           background: C.brandTint, border: `1px solid ${C.brand}40`,
@@ -224,12 +228,8 @@ function UploadModal({ onClose }) {
           </div>
           <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>or click to choose · max 20 MB</div>
         </div>
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-          <Btn variant="secondary" onClick={onClose}>Cancel</Btn>
-          <Btn onClick={submit}><I as={Fingerprint20Regular} size={14}/> Hash & Upload</Btn>
-        </div>
       </div>
-    </Modal>
+    </FormDrawer>
   );
 }
 
@@ -330,7 +330,7 @@ export function POEView() {
           <POEDrawer doc={selected} onClose={() => setSelectedId(null)}/>
         </Drawer>
       )}
-      {showUpload && <UploadModal onClose={() => setShowUpload(false)}/>}
+      {showUpload && <UploadPanel onClose={() => setShowUpload(false)}/>}
     </div>
   );
 }

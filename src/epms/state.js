@@ -76,6 +76,12 @@ export function epmsReducer(state, action) {
             : p),
       }, { userId: state.currentUser.id, action: "Signed PA", target: action.id });
 
+    case "ADD_PA":
+      return logActivity({
+        ...state,
+        performanceAgreements: [action.pa, ...state.performanceAgreements],
+      }, { userId: state.currentUser.id, action: "Created PA", target: action.pa.employee });
+
     case "MARK_COMPLIANCE":
       return logActivity({
         ...state,

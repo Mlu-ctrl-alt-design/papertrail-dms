@@ -65,6 +65,37 @@ export function Drawer({ onClose, width = 620, children }) {
   );
 }
 
+// ─── FormDrawer (Drawer with Modal-style header/body/footer chrome) ───────────
+// Use for quick-create forms — gives a side-panel popover with a sticky action
+// footer and a consistent close button.
+export function FormDrawer({ title, onClose, children, width = 520, footer }) {
+  return (
+    <Drawer onClose={onClose} width={width}>
+      <div style={{
+        padding: "16px 20px",
+        borderBottom: "1px solid rgba(0,0,0,0.08)",
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        flexShrink: 0,
+      }}>
+        <span style={{ fontSize: 15, fontWeight: 700, color: C.ink }}>{title}</span>
+        <button onClick={onClose} style={{
+          background: "none", border: "none", cursor: "pointer",
+          color: C.muted, padding: "2px 4px", display: "inline-flex", alignItems: "center",
+        }}>
+          <I as={Dismiss20Regular} size={18}/>
+        </button>
+      </div>
+      <div style={{ overflow: "auto", flex: 1 }}>{children}</div>
+      {footer && (
+        <div style={{
+          padding: "12px 20px", borderTop: "1px solid rgba(0,0,0,0.08)",
+          display: "flex", justifyContent: "flex-end", gap: 8, flexShrink: 0,
+        }}>{footer}</div>
+      )}
+    </Drawer>
+  );
+}
+
 // ─── ContextMenu (right-click style menu) ─────────────────────────────────────
 export function ContextMenu({ x, y, items, onClose }) {
   const ref = useRef();
