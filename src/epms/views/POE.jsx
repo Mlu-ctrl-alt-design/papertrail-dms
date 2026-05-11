@@ -153,10 +153,11 @@ function UploadModal({ onClose }) {
   const toast = useToast();
   const [title, setTitle] = useState("");
   const [kpi, setKpi] = useState("");
+  const [quarter, setQuarter] = useState("");
   const [source, setSource] = useState("Web upload");
   const submit = () => {
-    if (!title.trim() || !kpi) {
-      toast("Missing details", "Title and KPI link are required",
+    if (!title.trim() || !kpi || !quarter) {
+      toast("Missing details", "Title, KPI link, and quarter are required",
             { icon: <I as={Warning20Regular} size={16} color="#7a5700"/>, color: "#7a5700" });
       return;
     }
@@ -165,7 +166,7 @@ function UploadModal({ onClose }) {
       type: "ADD_POE",
       doc: {
         id: `poe_${Date.now()}`,
-        kpiCode: kpi,
+        kpiCode: `${kpi} / ${quarter}`,
         title,
         uploaded: "2026-05-10",
         uploader: state.currentUser.id,
@@ -197,9 +198,18 @@ function UploadModal({ onClose }) {
                 onChange={(e) => setKpi(e.target.value)}
                 placeholder="Select an indicator…"
                 options={state.sdbipTargets.map((t) => ({
-                  value: `${t.code} / Q3`,
+                  value: t.code,
                   label: `${t.code} · ${t.indicator}`,
                 }))}/>
+        <Select label="Reporting quarter" value={quarter}
+                onChange={(e) => setQuarter(e.target.value)}
+                placeholder="Select a quarter…"
+                options={[
+                  { value: "Q1", label: "Q1 (Jul–Sep)" },
+                  { value: "Q2", label: "Q2 (Oct–Dec)" },
+                  { value: "Q3", label: "Q3 (Jan–Mar)" },
+                  { value: "Q4", label: "Q4 (Apr–Jun)" },
+                ]}/>
         <Select label="Upload source" value={source}
                 onChange={(e) => setSource(e.target.value)}
                 options={["Web upload", "Mobile upload (field officer)", "Mobile upload"]}/>
