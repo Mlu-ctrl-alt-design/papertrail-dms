@@ -25,17 +25,22 @@ import { Avatar } from "../Avatar.jsx";
 import {
   KPAS, SERVICE_DELIVERY_OUTCOMES, IUDF_OUTCOMES,
   PROJECT_CATEGORIES, PROJECT_CATEGORY_RULES,
+  SO_CATALOGUE, PO_CATALOGUE,
   IDP_CYCLE, userById,
 } from "../data.js";
-import { kpaWeight, soWeight, kpaBandStatus } from "../helpers.js";
+import {
+  kpaWeight, soWeight, kpaBandStatus,
+  idpReadinessChecks, idpReadinessSummary,
+} from "../helpers.js";
 
 const TABS = [
-  { id: "kpa",  label: "KPAs",                    icon: Flag20Regular,             locked: true,  scope: "Treasury" },
-  { id: "sdo",  label: "Service Delivery",        icon: GlobeShield20Regular,      locked: true,  scope: "Treasury" },
-  { id: "iudf", label: "IUDF",                    icon: BuildingMultiple20Regular, locked: true,  scope: "Treasury" },
-  { id: "so",   label: "Strategic Objectives",    icon: Target20Regular,           locked: false, scope: "Municipal" },
-  { id: "po",   label: "Performance Objectives",  icon: Star20Filled,              locked: false, scope: "Municipal" },
-  { id: "kpi",  label: "Master KPIs",             icon: Sparkle20Regular,          locked: false, scope: "Municipal" },
+  { id: "kpa",    label: "KPAs",                    icon: Flag20Regular,             locked: true,  scope: "Treasury"  },
+  { id: "sdo",    label: "Service Delivery",        icon: GlobeShield20Regular,      locked: true,  scope: "Treasury"  },
+  { id: "iudf",   label: "IUDF",                    icon: BuildingMultiple20Regular, locked: true,  scope: "Treasury"  },
+  { id: "so",     label: "Strategic Objectives",    icon: Target20Regular,           locked: false, scope: "Municipal" },
+  { id: "po",     label: "Performance Objectives",  icon: Star20Filled,              locked: false, scope: "Municipal" },
+  { id: "kpi",    label: "Master KPIs",             icon: Sparkle20Regular,          locked: false, scope: "Municipal" },
+  { id: "health", label: "IDP Health",              icon: CheckmarkCircle20Filled,   locked: false, scope: "Readiness" },
 ];
 
 const kpaById  = (id) => KPAS.find((k) => k.id === id);
@@ -478,14 +483,54 @@ function KPIDrawer({ kpi, onClose }) {
 }
 
 // ─── Forms ───────────────────────────────────────────────────────────────────
-function NewSOForm({ defaultKpaId, onClose, onCreated }) {
+// Mode pill used in adoption forms (Adopt from catalogue / Request custom).
+function ModeToggle({ mode, setMode }) {
+  return (
+    <div style={{ display: "flex", gap: 4, padding: 3, background: C.surfaceMute,
+                  borderRadius: 4, marginBottom: 14 }}>
+      {[
+        { id: "adopt",  label: "Adopt from catalogue" },
+        { id: "custom", label: "Request custom" },
+      ].map((m) => (
+        <button key={m.id} onClick={() => setMode(m.id)} style={{
+          flex: 1, background: mode === m.id ? "#fff" : "transparent",
+          border: "none", borderRadius: 3, padding: "6px 10px",
+          fontSize: 12, fontWeight: 600, cursor: "pointer",
+          color: mode === m.id ? C.brand : C.muted, fontFamily: "inherit",
+          boxShadow: mode === m.id ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
+        }}>{m.label}</button>
+      ))}
+    </div>
+  );
+}
+
+function NewSOForm({ defaultKpaId, defaultCatalogueId, onClose, onCreated }) {
   const { state, dispatch } = useContext(EPMSContext);
   const toast = useToast();
-  const [kpaId, setKpaId] = useState(defaultKpaId || "");
-  const [code, setCode] = useState("");
-  const [title, setTitle] = useState("");
+  const [mode, setMode] = useState(defaultCatalogueId ? "adopt" : "adopt");
+  const adoptedIds = new Set(state.objectives.map((o) => o.catalogueId).filter(Boolean));
+  const [catalogueId, setCatalogueId] = useState(defaultCatalogueId || "");
+
+  // Custom-mode fields (only used when mode === "custom")
+  const [customKpaId, setCustomKpaId] = useState(defaultKpaId || "");
+  const [customCode, setCustomCode] = useState("");
+  const [customTitle, setCustomTitle] = useState("");
+
   const [owner, setOwner] = useState("");
   const [weight, setWeight] = useState(5);
+
+  const picked = catalogueId ? SO_CATALOGUE.find((c) => c.id === catalogueId) : null;
+  const kpaId = mode === "adopt" ? (picked?.kpaId || "") : customKpaId;
+
+  // Pre-fill suggested weight + default owner when picking a catalogue item.
+  const pickCatalogue = (id) => {
+    setCatalogueId(id);
+    const item = SO_CATALOGUE.find((c) => c.id === id);
+    if (item) {
+      setWeight(item.suggestedWeight || 5);
+      if (!owner) setOwner(item.defaultOwner || "");
+    }
+  };
 
   // Live KPA envelope check.
   const w = parseInt(weight, 10) || 0;
@@ -494,10 +539,28 @@ function NewSOForm({ defaultKpaId, onClose, onCreated }) {
     : null;
   const blocked = status?.state === "over";
 
+  // Sort catalogue: uncovered KPAs first, then by code.
+  const catalogueRows = SO_CATALOGUE.map((c) => {
+    const adopted = adoptedIds.has(c.id);
+    const kpaHasNoSO = state.objectives.filter((o) => o.kpaId === c.kpaId).length === 0;
+    return { ...c, adopted, kpaHasNoSO };
+  }).sort((a, b) => {
+    if (a.adopted !== b.adopted) return a.adopted ? 1 : -1;
+    if (a.kpaHasNoSO !== b.kpaHasNoSO) return a.kpaHasNoSO ? -1 : 1;
+    return a.code.localeCompare(b.code);
+  });
+
   const submit = () => {
-    if (!kpaId || !code.trim() || !title.trim() || !owner) {
+    const useTitle = mode === "adopt" ? (picked?.title || "") : customTitle.trim();
+    const useCode  = mode === "adopt" ? (picked?.code  || "") : customCode.trim();
+    const useKpaId = kpaId;
+    if (!useKpaId || !useCode || !useTitle || !owner) {
       toast("Missing details", "KPA, code, title and owner are required",
             { color: "#7a5700" });
+      return;
+    }
+    if (mode === "adopt" && !picked) {
+      toast("Pick a catalogue item", "", { color: "#7a5700" });
       return;
     }
     if (!w || w < 1) {
@@ -513,15 +576,16 @@ function NewSOForm({ defaultKpaId, onClose, onCreated }) {
     }
     const so = {
       id: `so_${Date.now()}`,
-      code: code.trim(), title: title.trim(),
-      kpaId, owner, weight: w,
+      catalogueId: mode === "adopt" ? catalogueId : null,
+      code: useCode, title: useTitle,
+      kpaId: useKpaId, owner, weight: w,
       baseline2022: "", target2027: "",
       status: "On track", progress: 0, risks: [],
     };
     dispatch({ type: "ADD_SO", so });
-    const toastTitle = status.state === "under"
-      ? `Created — KPA below floor (${status.projected}%)`
-      : "Strategic Objective created";
+    const toastTitle = status?.state === "under"
+      ? `Adopted — KPA below floor (${status.projected}%)`
+      : mode === "adopt" ? "Strategic Objective adopted" : "Custom Strategic Objective requested";
     toast(toastTitle, so.code,
           { icon: <I as={CheckmarkCircle20Filled} size={16} color="#107c10"/>, color: "#107c10" });
     if (onCreated) onCreated(so);
@@ -530,26 +594,90 @@ function NewSOForm({ defaultKpaId, onClose, onCreated }) {
 
   const kpaLabel = kpaId ? KPAS.find((k) => k.id === kpaId)?.code : "—";
   return (
-    <FormDrawer title="New Strategic Objective" onClose={onClose} width={520}
+    <FormDrawer title="Add Strategic Objective" onClose={onClose} width={560}
                 footer={<>
                   <Btn variant="secondary" onClick={onClose}>Cancel</Btn>
                   <Btn disabled={blocked} onClick={submit}>
-                    <I as={Add20Regular} size={14}/> Create
+                    <I as={Add20Regular} size={14}/>
+                    {mode === "adopt" ? "Adopt" : "Request custom"}
                   </Btn>
                 </>}>
       <div style={{ padding: 20 }}>
         <FormIntro>
-          A Strategic Objective must map to a single Treasury KPA.
-          Once created it unlocks Performance Objective composition.
+          The Strategic-Objective catalogue is provided centrally — municipalities
+          adopt items, set weights and owners, and decline the rest. Request a
+          custom SO only when no catalogue entry fits.
         </FormIntro>
-        <Select label="Parent KPA" value={kpaId}
-                onChange={(e) => setKpaId(e.target.value)}
-                placeholder="Select a KPA…"
-                options={KPAS.map((k) => ({ value: k.id, label: `${k.code} · ${k.label}` }))}/>
-        <Input label="SO code" value={code} onChange={(e) => setCode(e.target.value)}
-               placeholder="e.g. SO 1.4"/>
-        <Input label="Title" value={title} onChange={(e) => setTitle(e.target.value)}
-               placeholder="What outcome does this objective pursue?"/>
+        <ModeToggle mode={mode} setMode={setMode}/>
+
+        {mode === "adopt" && (
+          <>
+            <div style={{ fontSize: 11, fontWeight: 700, color: C.muted,
+                          textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 6 }}>
+              Pick from catalogue
+            </div>
+            <div style={{
+              border: `1px solid ${C.hairline}`, borderRadius: 4,
+              maxHeight: 240, overflow: "auto", background: "#fff", marginBottom: 14,
+            }}>
+              {catalogueRows.map((c) => {
+                const k = kpaById(c.kpaId);
+                const selected = c.id === catalogueId;
+                return (
+                  <button key={c.id}
+                          disabled={c.adopted}
+                          onClick={() => pickCatalogue(c.id)} style={{
+                    width: "100%", textAlign: "left", border: "none",
+                    background: selected ? `${k.color}12` : "transparent",
+                    borderBottom: `1px solid ${C.hairline}`,
+                    padding: "9px 12px",
+                    cursor: c.adopted ? "not-allowed" : "pointer",
+                    opacity: c.adopted ? 0.5 : 1,
+                    fontFamily: "inherit",
+                    display: "flex", alignItems: "flex-start", gap: 10,
+                  }}>
+                    <div style={{
+                      width: 26, height: 26, borderRadius: 4, background: k.color,
+                      color: "#fff", display: "grid", placeItems: "center",
+                      fontWeight: 700, fontSize: 10, flexShrink: 0,
+                    }}>{k.code.replace("KPA ", "")}</div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 10, color: k.color, fontWeight: 700,
+                                    letterSpacing: "0.4px" }}>{c.code}</div>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: C.ink,
+                                    lineHeight: 1.3 }}>{c.title}</div>
+                      <div style={{ fontSize: 10, color: C.muted, marginTop: 2 }}>
+                        Suggested weight {c.suggestedWeight}%
+                        {c.kpaHasNoSO && !c.adopted && (
+                          <span style={{ color: C.warning, fontWeight: 700, marginLeft: 8 }}>
+                            · KPA not yet covered
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {c.adopted && (
+                      <Pill bg={C.surfaceMute} fg={C.muted}>Already adopted</Pill>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </>
+        )}
+
+        {mode === "custom" && (
+          <>
+            <Select label="Parent KPA" value={customKpaId}
+                    onChange={(e) => setCustomKpaId(e.target.value)}
+                    placeholder="Select a KPA…"
+                    options={KPAS.map((k) => ({ value: k.id, label: `${k.code} · ${k.label}` }))}/>
+            <Input label="SO code" value={customCode} onChange={(e) => setCustomCode(e.target.value)}
+                   placeholder="e.g. SO 1.7"/>
+            <Input label="Title" value={customTitle} onChange={(e) => setCustomTitle(e.target.value)}
+                   placeholder="What outcome does this objective pursue?"/>
+          </>
+        )}
+
         <Input label="Weight (% of municipal effort / capital)" type="number"
                value={weight} onChange={(e) => setWeight(e.target.value)} placeholder="5"/>
         {status && (
@@ -577,9 +705,11 @@ function NewPOForm({ defaultSoId, onClose, onCreated }) {
   const { state, dispatch } = useContext(EPMSContext);
   const toast = useToast();
   const sos = state.objectives;
+  const [mode, setMode] = useState("adopt");
   const [soId, setSoId] = useState(defaultSoId || "");
-  const [code, setCode] = useState("");
-  const [title, setTitle] = useState("");
+  const [catalogueId, setCatalogueId] = useState("");
+  const [customCode, setCustomCode] = useState("");
+  const [customTitle, setCustomTitle] = useState("");
   const [owner, setOwner] = useState("");
   const [weight, setWeight] = useState(3);
 
@@ -591,10 +721,35 @@ function NewPOForm({ defaultSoId, onClose, onCreated }) {
   const blocked = parentSO && projected > soMax;
   const under   = parentSO && projected < soMax;
 
+  // PO catalogue filtered to the parent SO's catalogue entry, with already-
+  // adopted items flagged.
+  const adoptedPOIds = new Set(state.performanceObjectives.map((p) => p.catalogueId).filter(Boolean));
+  const catalogueRows = parentSO?.catalogueId
+    ? PO_CATALOGUE.filter((p) => p.soCatalogueId === parentSO.catalogueId)
+        .map((p) => ({ ...p, adopted: adoptedPOIds.has(p.id) }))
+    : [];
+
+  const pickCatalogue = (id) => {
+    setCatalogueId(id);
+    const item = PO_CATALOGUE.find((p) => p.id === id);
+    if (item) {
+      setWeight(item.suggestedWeight || 3);
+      if (!owner) setOwner(item.defaultOwner || "");
+    }
+  };
+
+  const picked = catalogueId ? PO_CATALOGUE.find((p) => p.id === catalogueId) : null;
+
   const submit = () => {
-    if (!soId || !code.trim() || !title.trim() || !owner) {
+    const useTitle = mode === "adopt" ? (picked?.title || "") : customTitle.trim();
+    const useCode  = mode === "adopt" ? (picked?.code  || "") : customCode.trim();
+    if (!soId || !useCode || !useTitle || !owner) {
       toast("Missing details", "Parent SO, code, title and owner are required",
             { color: "#7a5700" });
+      return;
+    }
+    if (mode === "adopt" && !picked) {
+      toast("Pick a catalogue item", "", { color: "#7a5700" });
       return;
     }
     if (!w || w < 1) {
@@ -610,43 +765,123 @@ function NewPOForm({ defaultSoId, onClose, onCreated }) {
     }
     const po = {
       id: `po_${Date.now()}`,
-      code: code.trim(), title: title.trim(),
+      catalogueId: mode === "adopt" ? catalogueId : null,
+      code: useCode, title: useTitle,
       soId, kpaId: parentSO.kpaId, owner, weight: w,
     };
     dispatch({ type: "ADD_PO", po });
     const toastTitle = under
-      ? `Created — SO under-decomposed (${projected}% / ${soMax}%)`
-      : "Performance Objective created";
+      ? `Adopted — SO under-decomposed (${projected}% / ${soMax}%)`
+      : mode === "adopt" ? "Performance Objective adopted" : "Custom Performance Objective requested";
     toast(toastTitle, po.code,
           { icon: <I as={CheckmarkCircle20Filled} size={16} color="#107c10"/>, color: "#107c10" });
     if (onCreated) onCreated(po);
     onClose();
   };
+
+  // Sort parent-SO options: uncovered SOs first (no POs yet), then alphabetical.
+  const sortedSOs = [...sos].sort((a, b) => {
+    const aHas = state.performanceObjectives.some((p) => p.soId === a.id);
+    const bHas = state.performanceObjectives.some((p) => p.soId === b.id);
+    if (aHas !== bHas) return aHas ? 1 : -1;
+    return a.code.localeCompare(b.code);
+  });
+
   return (
-    <FormDrawer title="New Performance Objective" onClose={onClose} width={520}
+    <FormDrawer title="Add Performance Objective" onClose={onClose} width={560}
                 footer={<>
                   <Btn variant="secondary" onClick={onClose}>Cancel</Btn>
                   <Btn disabled={blocked} onClick={submit}>
-                    <I as={Add20Regular} size={14}/> Create
+                    <I as={Add20Regular} size={14}/>
+                    {mode === "adopt" ? "Adopt" : "Request custom"}
                   </Btn>
                 </>}>
       <div style={{ padding: 20 }}>
         <FormIntro>
-          A Performance Objective must sit under one Strategic Objective.
-          Treasury enforces (KPA + SO) as the composite parent. The sum of PO
-          weights under an SO must not exceed the parent SO's allocation.
+          Each Performance Objective sits under one Strategic Objective. Pick a
+          PO from the catalogue tied to the parent SO, or request a custom PO
+          when no catalogue entry fits.
         </FormIntro>
+        <ModeToggle mode={mode} setMode={setMode}/>
+
         <Select label="Parent Strategic Objective" value={soId}
-                onChange={(e) => setSoId(e.target.value)}
+                onChange={(e) => { setSoId(e.target.value); setCatalogueId(""); }}
                 placeholder="Select a Strategic Objective…"
-                options={sos.map((o) => {
+                options={sortedSOs.map((o) => {
                   const k = kpaById(o.kpaId);
-                  return { value: o.id, label: `${k.code} · ${o.code} · ${o.title} (weight ${o.weight || 0}%)` };
+                  const hasPO = state.performanceObjectives.some((p) => p.soId === o.id);
+                  const flag = hasPO ? "" : " · uncovered";
+                  return { value: o.id, label: `${k.code} · ${o.code} · ${o.title}${flag}` };
                 })}/>
-        <Input label="PO code" value={code} onChange={(e) => setCode(e.target.value)}
-               placeholder="e.g. PO 1.4.1"/>
-        <Input label="Title" value={title} onChange={(e) => setTitle(e.target.value)}
-               placeholder="Decompose the SO into a measurable target…"/>
+
+        {mode === "adopt" && (
+          <>
+            <div style={{ fontSize: 11, fontWeight: 700, color: C.muted,
+                          textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 6 }}>
+              Catalogue PO under {parentSO?.code || "selected SO"}
+            </div>
+            <div style={{
+              border: `1px solid ${C.hairline}`, borderRadius: 4,
+              maxHeight: 220, overflow: "auto", background: "#fff", marginBottom: 14,
+            }}>
+              {!parentSO && (
+                <div style={{ padding: "12px 14px", fontSize: 12, color: C.faint }}>
+                  Pick a parent Strategic Objective first.
+                </div>
+              )}
+              {parentSO && !parentSO.catalogueId && (
+                <div style={{ padding: "12px 14px", fontSize: 12, color: C.muted }}>
+                  Parent SO is a custom (non-catalogue) item — switch to "Request custom" below.
+                </div>
+              )}
+              {parentSO && parentSO.catalogueId && catalogueRows.length === 0 && (
+                <div style={{ padding: "12px 14px", fontSize: 12, color: C.muted }}>
+                  No catalogue POs left under {parentSO.code}.
+                </div>
+              )}
+              {catalogueRows.map((p) => {
+                const selected = p.id === catalogueId;
+                return (
+                  <button key={p.id}
+                          disabled={p.adopted}
+                          onClick={() => pickCatalogue(p.id)} style={{
+                    width: "100%", textAlign: "left", border: "none",
+                    background: selected ? C.brandTint : "transparent",
+                    borderBottom: `1px solid ${C.hairline}`,
+                    padding: "9px 12px",
+                    cursor: p.adopted ? "not-allowed" : "pointer",
+                    opacity: p.adopted ? 0.5 : 1,
+                    fontFamily: "inherit", fontSize: 12,
+                    display: "flex", alignItems: "flex-start", gap: 10,
+                  }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 10, color: C.muted, fontWeight: 700 }}>{p.code}</div>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: C.ink, lineHeight: 1.3 }}>
+                        {p.title}
+                      </div>
+                      <div style={{ fontSize: 10, color: C.muted, marginTop: 2 }}>
+                        Suggested weight {p.suggestedWeight}%
+                      </div>
+                    </div>
+                    {p.adopted && (
+                      <Pill bg={C.surfaceMute} fg={C.muted}>Adopted</Pill>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </>
+        )}
+
+        {mode === "custom" && (
+          <>
+            <Input label="PO code" value={customCode} onChange={(e) => setCustomCode(e.target.value)}
+                   placeholder="e.g. PO 1.4.2"/>
+            <Input label="Title" value={customTitle} onChange={(e) => setCustomTitle(e.target.value)}
+                   placeholder="Decompose the SO into a measurable target…"/>
+          </>
+        )}
+
         <Input label="Weight (% within parent SO)" type="number"
                value={weight} onChange={(e) => setWeight(e.target.value)} placeholder="3"/>
         {parentSO && (
@@ -670,7 +905,7 @@ function NewPOForm({ defaultSoId, onClose, onCreated }) {
   );
 }
 
-function NewKPIForm({ defaultPoId, onClose, onCreated }) {
+function NewKPIForm({ defaultPoId, defaultSdoId, defaultIudfId, onClose, onCreated }) {
   const { state, dispatch } = useContext(EPMSContext);
   const toast = useToast();
   const pos = state.performanceObjectives;
@@ -681,8 +916,8 @@ function NewKPIForm({ defaultPoId, onClose, onCreated }) {
   const [target, setTarget] = useState("");
   const [baseline, setBaseline] = useState("");
   const [projectCategory, setProjectCategory] = useState("");
-  const [sdoId, setSdoId] = useState("");
-  const [iudfId, setIudfId] = useState("");
+  const [sdoId, setSdoId] = useState(defaultSdoId || "");
+  const [iudfId, setIudfId] = useState(defaultIudfId || "");
   const [fy, setFy] = useState("2026/27");
   const [owner, setOwner] = useState("");
 
@@ -700,14 +935,27 @@ function NewKPIForm({ defaultPoId, onClose, onCreated }) {
                        .map((u) => ({ value: u.id, label: `${u.code} · ${u.label}` }));
 
   // Clear SDO / IUDF the moment the project category narrows them out of range.
+  // If a target SDO/IUDF was passed in (from a Health-tab Resolve action) and
+  // the new category supports it, snap it back in.
   const pickCategory = (next) => {
     setProjectCategory(next);
     const r = next ? PROJECT_CATEGORY_RULES[next] : null;
     if (r) {
-      if (sdoId && !r.sdo.includes(sdoId)) setSdoId("");
-      if (iudfId && !r.iudf.includes(iudfId)) setIudfId("");
+      let nextSdo = sdoId;
+      let nextIudf = iudfId;
+      if (nextSdo && !r.sdo.includes(nextSdo)) nextSdo = "";
+      if (nextIudf && !r.iudf.includes(nextIudf)) nextIudf = "";
+      if (!nextSdo && defaultSdoId && r.sdo.includes(defaultSdoId)) nextSdo = defaultSdoId;
+      if (!nextIudf && defaultIudfId && r.iudf.includes(defaultIudfId)) nextIudf = defaultIudfId;
+      setSdoId(nextSdo);
+      setIudfId(nextIudf);
     }
   };
+
+  // Coverage hint shown when this composer was opened from an IDP Health
+  // Resolve action.
+  const targetSdo  = defaultSdoId  ? sdoById(defaultSdoId)  : null;
+  const targetIudf = defaultIudfId ? iudfById(defaultIudfId) : null;
 
   const submit = () => {
     if (!poId || !code.trim() || !title.trim() || !sdoId || !iudfId || !owner || !projectCategory) {
@@ -744,6 +992,20 @@ function NewKPIForm({ defaultPoId, onClose, onCreated }) {
           (KPA + Strategic Objective + Performance Objective + Service Delivery Outcome + IUDF).
           Pick a project category first — Treasury rulesets will constrain the SDO and IUDF options.
         </FormIntro>
+        {(targetSdo || targetIudf) && (
+          <div style={{
+            background: C.warningBg, border: `1px solid ${C.warning}30`,
+            borderRadius: 4, padding: "10px 12px", marginBottom: 14,
+            fontSize: 12, color: C.ink, lineHeight: 1.5,
+          }}>
+            <strong style={{ color: C.warning }}>Coverage hint:</strong>{" "}
+            this KPI is intended to close a gap on{" "}
+            {targetSdo && <strong>{targetSdo.code} ({targetSdo.label})</strong>}
+            {targetSdo && targetIudf && " and "}
+            {targetIudf && <strong>{targetIudf.code} ({targetIudf.label})</strong>}.
+            Pick a project category whose Treasury ruleset includes it and the field will pre-fill.
+          </div>
+        )}
 
         <Select label="Parent Performance Objective" value={poId}
                 onChange={(e) => setPoId(e.target.value)}
@@ -1094,6 +1356,114 @@ function downloadText(name, body) {
   setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 0);
 }
 
+// ─── IDP Health panel (readiness checklist) ─────────────────────────────────
+const HEALTH_GROUPS = [
+  { id: "kpa-cov",     label: "KPA coverage",                 hint: "Each KPA must have at least one Strategic Objective and Master KPI." },
+  { id: "sdo-cov",     label: "Service Delivery coverage",    hint: "Every Treasury Service Delivery Outcome must be referenced by ≥1 KPI." },
+  { id: "iudf-cov",    label: "IUDF coverage",                hint: "Every IUDF priority must be referenced by ≥1 KPI." },
+  { id: "kpa-balance", label: "KPA balance",                  hint: "Each KPA's allocated effort must sit inside its IDP envelope." },
+];
+
+function ReadinessMeter({ summary, size = "md" }) {
+  const fg = summary.pct === 100 ? C.success : summary.pct >= 75 ? C.brand : summary.pct >= 50 ? C.warning : C.danger;
+  const pad = size === "sm" ? "3px 8px" : "5px 12px";
+  const fs  = size === "sm" ? 11 : 12;
+  return (
+    <span style={{
+      display: "inline-flex", alignItems: "center", gap: 8,
+      background: `${fg}15`, color: fg, fontWeight: 700,
+      borderRadius: 100, padding: pad, fontSize: fs,
+    }}>
+      IDP {summary.passed} / {summary.total} · {summary.pct}%
+    </span>
+  );
+}
+
+function IDPHealthPanel({ checks, onResolve }) {
+  const summary = idpReadinessSummary(checks);
+  const fg = summary.pct === 100 ? C.success : summary.pct >= 75 ? C.brand : summary.pct >= 50 ? C.warning : C.danger;
+  return (
+    <div style={{ flex: 1, overflow: "auto", padding: "16px 22px" }}>
+      <div style={{
+        background: "#fff", border: `1px solid ${fg}40`, borderRadius: 4,
+        padding: "16px 18px", marginBottom: 16,
+      }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between",
+                      flexWrap: "wrap", gap: 10 }}>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: C.muted,
+                          textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 4 }}>
+              IDP readiness
+            </div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: fg }}>
+              {summary.passed} of {summary.total} checks passing · {summary.pct}%
+            </div>
+            <div style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>
+              {summary.pct === 100
+                ? "All Treasury coverage and balance gates are clear — the IDP can be exported."
+                : `${summary.gaps} gap${summary.gaps === 1 ? "" : "s"} block the National Treasury (PRTA / PROR / PRAD) export.`}
+            </div>
+          </div>
+          <div style={{ flex: "0 0 320px", maxWidth: "100%" }}>
+            <div style={{ height: 10, background: C.surfaceMute, borderRadius: 100, overflow: "hidden" }}>
+              <div style={{ height: "100%", width: `${summary.pct}%`,
+                            background: fg, borderRadius: 100, transition: "width 0.3s" }}/>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {HEALTH_GROUPS.map((g) => {
+        const groupChecks = checks.filter((c) => c.group === g.id);
+        const groupOk = groupChecks.filter((c) => c.status === "ok").length;
+        return (
+          <div key={g.id} style={{ marginBottom: 18 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline",
+                          marginBottom: 4 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: C.ink }}>{g.label}</div>
+              <div style={{ fontSize: 11, color: C.muted }}>
+                {groupOk} / {groupChecks.length} passing
+              </div>
+            </div>
+            <div style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>{g.hint}</div>
+            <div style={{ background: "#fff", border: `1px solid ${C.hairline}`, borderRadius: 4,
+                          overflow: "hidden" }}>
+              {groupChecks.map((c, i) => {
+                const ok = c.status === "ok";
+                return (
+                  <div key={c.id} style={{
+                    display: "flex", alignItems: "center", gap: 12,
+                    padding: "10px 14px",
+                    borderTop: i === 0 ? "none" : `1px solid ${C.hairline}`,
+                  }}>
+                    <span style={{
+                      width: 22, height: 22, borderRadius: "50%",
+                      background: ok ? C.successBg : C.warningBg,
+                      color: ok ? C.success : C.warning,
+                      display: "grid", placeItems: "center", flexShrink: 0,
+                    }}>
+                      <I as={ok ? CheckmarkCircle20Filled : Warning20Regular} size={13}/>
+                    </span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: C.ink }}>{c.label}</div>
+                      <div style={{ fontSize: 11, color: ok ? C.muted : C.warning }}>{c.details}</div>
+                    </div>
+                    {!ok && (
+                      <Btn variant="secondary" size="sm" onClick={() => onResolve(c)}>
+                        Resolve <I as={ArrowRight20Regular} size={12}/>
+                      </Btn>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ─── Layout helpers ──────────────────────────────────────────────────────────
 function Field({ label, children }) {
   return (
@@ -1138,6 +1508,13 @@ export function IDPView() {
   const toast = useToast();
   const [tab, setTab] = useState("kpa");
   const [selectedId, setSelectedId] = useState(null);
+
+  // Composer defaults — set by Resolve actions on the IDP Health tab so the
+  // composers open already pointing at the gap that needs filling.
+  const [newSoDefaultKpa, setNewSoDefaultKpa] = useState("");
+  const [newKpiDefaultSdo, setNewKpiDefaultSdo] = useState("");
+  const [newKpiDefaultIudf, setNewKpiDefaultIudf] = useState("");
+
   const [showNewSo, setShowNewSo] = useState(false);
   const [showNewPo, setShowNewPo] = useState(false);
   const [showNewKpi, setShowNewKpi] = useState(false);
@@ -1150,6 +1527,59 @@ export function IDPView() {
   const tabMeta = TABS.find((t) => t.id === tab);
   const hasSOs = state.objectives.length > 0;
   const hasPOs = state.performanceObjectives.length > 0;
+
+  // IDP readiness — drives the meter, the Health tab, and the export gate.
+  const checks = idpReadinessChecks({
+    objectives: state.objectives,
+    performanceObjectives: state.performanceObjectives,
+    masterKpis: state.masterKpis,
+    kpas: KPAS,
+    sdos: SERVICE_DELIVERY_OUTCOMES,
+    iudfs: IUDF_OUTCOMES,
+    bands: IDP_CYCLE.kpaBands,
+  });
+  const summary = idpReadinessSummary(checks);
+
+  const openSoComposer = (kpaId = "") => {
+    setNewSoDefaultKpa(kpaId);
+    setShowNewSo(true);
+  };
+  const openKpiComposer = ({ sdoId = "", iudfId = "" } = {}) => {
+    if (!hasPOs) {
+      setTab("po");
+      toast("Create a Performance Objective first", "Master KPIs must sit under a PO.",
+            { color: "#7a5700" });
+      return;
+    }
+    setNewKpiDefaultSdo(sdoId);
+    setNewKpiDefaultIudf(iudfId);
+    setShowNewKpi(true);
+  };
+
+  const resolveCheck = (check) => {
+    const { kind, filters } = check.resolve || {};
+    if (kind === "so-picker") {
+      openSoComposer(filters?.kpaId || "");
+    } else if (kind === "kpi-composer") {
+      openKpiComposer({ sdoId: filters?.sdoId, iudfId: filters?.iudfId });
+    }
+  };
+
+  // Export gate — refuse to download when readiness < 100%.
+  const guardedExport = (phase) => () => {
+    if (summary.pct < 100) {
+      const firstGap = checks.find((c) => c.status === "gap");
+      toast("Export blocked",
+            `${summary.gaps} IDP readiness gap${summary.gaps === 1 ? "" : "s"} remaining. First: ${firstGap?.label}.`,
+            { color: C.danger, icon: <I as={Warning20Regular} size={16} color={C.danger}/> });
+      setTab("health");
+      return;
+    }
+    const body = ntExportString(state.masterKpis, phase, "2026/27");
+    downloadText(`${phase}_2026-27.txt`, body);
+    toast(`${phase} exported`, `${state.masterKpis.length} records`,
+          { color: "#107c10", icon: <I as={CheckmarkCircle20Filled} size={16} color="#107c10"/> });
+  };
 
   const rows = (() => {
     switch (tab) {
@@ -1364,26 +1794,11 @@ export function IDPView() {
       ],
       [
         { right: true, icon: ArrowDownload20Regular, label: "Tabled IDP (PRTA)",
-          onClick: () => {
-            const body = ntExportString(state.masterKpis, "PRTA", "2026/27");
-            downloadText("PRTA_2026-27.txt", body);
-            toast("PRTA exported", `${state.masterKpis.length} records`,
-                  { color: "#107c10", icon: <I as={CheckmarkCircle20Filled} size={16} color="#107c10"/> });
-          } },
+          disabled: summary.pct < 100, onClick: guardedExport("PRTA") },
         { right: true, icon: ArrowDownload20Regular, label: "Original IDP (PROR)",
-          onClick: () => {
-            const body = ntExportString(state.masterKpis, "PROR", "2026/27");
-            downloadText("PROR_2026-27.txt", body);
-            toast("PROR exported", `${state.masterKpis.length} records`,
-                  { color: "#107c10", icon: <I as={CheckmarkCircle20Filled} size={16} color="#107c10"/> });
-          } },
+          disabled: summary.pct < 100, onClick: guardedExport("PROR") },
         { right: true, icon: ArrowDownload20Regular, label: "Adjusted IDP (PRAD)",
-          onClick: () => {
-            const body = ntExportString(state.masterKpis, "PRAD", "2026/27");
-            downloadText("PRAD_2026-27.txt", body);
-            toast("PRAD exported", `${state.masterKpis.length} records`,
-                  { color: "#107c10", icon: <I as={CheckmarkCircle20Filled} size={16} color="#107c10"/> });
-          } },
+          disabled: summary.pct < 100, onClick: guardedExport("PRAD") },
       ],
     ];
   })();
@@ -1404,7 +1819,21 @@ export function IDPView() {
     <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
       <ViewHeader
         title="IDP & Performance Framework"
-        subtitle={`${IDP_CYCLE.label} · ${IDP_CYCLE.reviewYear} · ${tabMeta?.scope} parameters`}
+        subtitle={
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <span>{IDP_CYCLE.label} · {IDP_CYCLE.reviewYear}</span>
+            <span style={{ opacity: 0.4 }}>·</span>
+            <ReadinessMeter summary={summary} size="sm"/>
+            {summary.pct < 100 && tab !== "health" && (
+              <button onClick={() => setTab("health")} style={{
+                background: "none", border: "none", cursor: "pointer",
+                color: C.brand, fontFamily: "inherit", fontSize: 11, fontWeight: 600, padding: 0,
+              }}>
+                See {summary.gaps} gap{summary.gaps === 1 ? "" : "s"} →
+              </button>
+            )}
+          </span>
+        }
         action={tab === "kpi" && state.masterKpis.length === 0
           ? <Btn onClick={() => setShowWizard(true)}><I as={Sparkle20Regular} size={14}/> Run setup wizard</Btn>
           : null}
@@ -1429,22 +1858,26 @@ export function IDPView() {
           onAction={() => setTab("po")}/>
       )}
 
-      <DataTable
-        rows={rows}
-        columns={cols}
-        getKey={(r) => r.id}
-        searchPlaceholder={`Search ${tabMeta?.label?.toLowerCase()}…`}
-        searchKeys={["code", "title", "label"]}
-        defaultSort={{ col: "code", dir: "asc" }}
-        onRowClick={(r) => setSelectedId(r.id)}
-        selectedKey={selectedId}
-        emptyMessage={
-          tab === "po"  ? "No Performance Objectives yet."
-        : tab === "kpi" ? "No Master KPIs yet — run the setup wizard to compose your first."
-        : tab === "so"  ? "No Strategic Objectives yet."
-        : "No records."
-        }
-      />
+      {tab === "health" ? (
+        <IDPHealthPanel checks={checks} onResolve={resolveCheck}/>
+      ) : (
+        <DataTable
+          rows={rows}
+          columns={cols}
+          getKey={(r) => r.id}
+          searchPlaceholder={`Search ${tabMeta?.label?.toLowerCase()}…`}
+          searchKeys={["code", "title", "label"]}
+          defaultSort={{ col: "code", dir: "asc" }}
+          onRowClick={(r) => setSelectedId(r.id)}
+          selectedKey={selectedId}
+          emptyMessage={
+            tab === "po"  ? "No Performance Objectives yet."
+          : tab === "kpi" ? "No Master KPIs yet — run the setup wizard to compose your first."
+          : tab === "so"  ? "No Strategic Objectives yet."
+          : "No records."
+          }
+        />
+      )}
 
       {selected && (
         <Drawer onClose={() => setSelectedId(null)} width={640}>
@@ -1452,9 +1885,22 @@ export function IDPView() {
         </Drawer>
       )}
 
-      {showNewSo  && <NewSOForm  onClose={() => setShowNewSo(false)}/>}
+      {showNewSo  && (
+        <NewSOForm
+          defaultKpaId={newSoDefaultKpa}
+          onClose={() => { setShowNewSo(false); setNewSoDefaultKpa(""); }}/>
+      )}
       {showNewPo  && <NewPOForm  onClose={() => setShowNewPo(false)}/>}
-      {showNewKpi && <NewKPIForm onClose={() => setShowNewKpi(false)}/>}
+      {showNewKpi && (
+        <NewKPIForm
+          defaultSdoId={newKpiDefaultSdo}
+          defaultIudfId={newKpiDefaultIudf}
+          onClose={() => {
+            setShowNewKpi(false);
+            setNewKpiDefaultSdo("");
+            setNewKpiDefaultIudf("");
+          }}/>
+      )}
       {showCopy   && <CopyKpisForm onClose={() => setShowCopy(false)}/>}
       {showWizard && (
         <SetupWizard

@@ -91,3 +91,65 @@ export const kpaBandStatus = (kpaId, objectives, bands, simulated = 0, excludeSo
   else if (projected < band.min) state = "under";
   return { kpaId, current, projected, band, state, deltaText: `${current}% → ${projected}%` };
 };
+
+// ─── IDP readiness — coverage + balance checks ───────────────────────────────
+// Produces a flat array of checks the Health tab, the meter and the export
+// gate all consume. 28 checks total: 5 KPA coverage + 14 SDO coverage + 4
+// IUDF coverage + 5 KPA balance.
+//   group: "kpa-cov" | "sdo-cov" | "iudf-cov" | "kpa-balance"
+//   status: "ok" | "gap"
+//   resolve: { kind: "so-picker" | "kpi-composer", filters: { ... } }
+export const idpReadinessChecks = ({ objectives, masterKpis, kpas, sdos, iudfs, bands }) => {
+  const checks = [];
+
+  // KPA coverage — each KPA needs ≥1 SO and ≥1 KPI to be considered covered.
+  kpas.forEach((k) => {
+    const soCount = objectives.filter((o) => o.kpaId === k.id).length;
+    const kpiCount = masterKpis.filter((m) => m.kpaId === k.id).length;
+    let status = "ok"; let details = `${soCount} SO · ${kpiCount} KPI`;
+    if (soCount === 0)       { status = "gap"; details = "No Strategic Objective yet"; }
+    else if (kpiCount === 0) { status = "gap"; details = `${soCount} SO · no Master KPI yet`; }
+    checks.push({ id: `kpa-cov-${k.id}`, group: "kpa-cov", label: `${k.code} · ${k.label}`, status, details,
+                  resolve: { kind: soCount === 0 ? "so-picker" : "kpi-composer", filters: { kpaId: k.id } } });
+  });
+
+  // SDO coverage — each Treasury SDO must be referenced by ≥1 Master KPI.
+  sdos.forEach((s) => {
+    const count = masterKpis.filter((m) => m.sdoId === s.id).length;
+    const status = count > 0 ? "ok" : "gap";
+    checks.push({ id: `sdo-cov-${s.id}`, group: "sdo-cov", label: `${s.code} · ${s.label}`,
+                  status, details: count > 0 ? `${count} KPI` : "No KPI references this outcome",
+                  resolve: { kind: "kpi-composer", filters: { sdoId: s.id } } });
+  });
+
+  // IUDF coverage — each IUDF priority must be referenced by ≥1 Master KPI.
+  iudfs.forEach((u) => {
+    const count = masterKpis.filter((m) => m.iudfId === u.id).length;
+    const status = count > 0 ? "ok" : "gap";
+    checks.push({ id: `iudf-cov-${u.id}`, group: "iudf-cov", label: `${u.code} · ${u.label}`,
+                  status, details: count > 0 ? `${count} KPI` : "No KPI references this priority",
+                  resolve: { kind: "kpi-composer", filters: { iudfId: u.id } } });
+  });
+
+  // KPA balance — each KPA's allocated weight must sit inside its band.
+  kpas.forEach((k) => {
+    const bs = kpaBandStatus(k.id, objectives, bands);
+    const status = bs.state === "ok" ? "ok" : "gap";
+    const details = bs.band
+      ? bs.state === "over"  ? `${bs.current}% allocated — exceeds max ${bs.band.max}%`
+      : bs.state === "under" ? `${bs.current}% allocated — below min ${bs.band.min}%`
+      : `${bs.current}% allocated (band ${bs.band.min}–${bs.band.max}%)`
+      : `${bs.current}% allocated`;
+    checks.push({ id: `kpa-bal-${k.id}`, group: "kpa-balance", label: `${k.code} balance`,
+                  status, details,
+                  resolve: { kind: "so-picker", filters: { kpaId: k.id } } });
+  });
+
+  return checks;
+};
+
+export const idpReadinessSummary = (checks) => {
+  const total = checks.length;
+  const passed = checks.filter((c) => c.status === "ok").length;
+  return { total, passed, gaps: total - passed, pct: total === 0 ? 100 : Math.round((passed / total) * 100) };
+};

@@ -150,19 +150,113 @@ export const IDP_CYCLE = {
   },
 };
 
+// Master Strategic-Objective catalogue. National Treasury circulates this menu;
+// municipalities adopt items from it, set weights and owners, and decline
+// the rest. Each entry suggests a default weight band so planners have a
+// sensible starting point that respects the KPA envelopes in IDP_CYCLE.
+export const SO_CATALOGUE = [
+  // KPA 1 — Basic Service Delivery & Infrastructure
+  { id: "so_cat_1_1", code: "SO 1.1", kpaId: "kpa1", title: "Provide reliable electricity to all formal households",                 suggestedWeight: 15, defaultOwner: "u_tech" },
+  { id: "so_cat_1_2", code: "SO 1.2", kpaId: "kpa1", title: "Maintain ageing electricity infrastructure (NMD reductions)",            suggestedWeight: 10, defaultOwner: "u_tech" },
+  { id: "so_cat_1_3", code: "SO 1.3", kpaId: "kpa1", title: "Improve refuse collection coverage in informal areas",                   suggestedWeight: 10, defaultOwner: "u_comm" },
+  { id: "so_cat_1_4", code: "SO 1.4", kpaId: "kpa1", title: "Ensure clean drinking water reaches all households",                     suggestedWeight: 12, defaultOwner: "u_tech" },
+  { id: "so_cat_1_5", code: "SO 1.5", kpaId: "kpa1", title: "Upgrade and resurface the internal municipal road network",              suggestedWeight:  8, defaultOwner: "u_tech" },
+  { id: "so_cat_1_6", code: "SO 1.6", kpaId: "kpa1", title: "Provide adequate sanitation services across the municipality",           suggestedWeight:  8, defaultOwner: "u_tech" },
+
+  // KPA 2 — Local Economic Development
+  { id: "so_cat_2_1", code: "SO 2.1", kpaId: "kpa2", title: "Promote tourism around Kruger gateway",                                  suggestedWeight: 10, defaultOwner: "u_corp" },
+  { id: "so_cat_2_2", code: "SO 2.2", kpaId: "kpa2", title: "Support SMME development in township and rural economies",               suggestedWeight:  6, defaultOwner: "u_corp" },
+  { id: "so_cat_2_3", code: "SO 2.3", kpaId: "kpa2", title: "Facilitate agro-processing and food-security initiatives",               suggestedWeight:  5, defaultOwner: "u_corp" },
+  { id: "so_cat_2_4", code: "SO 2.4", kpaId: "kpa2", title: "Develop industrial parks and special economic zones",                    suggestedWeight:  6, defaultOwner: "u_corp" },
+  { id: "so_cat_2_5", code: "SO 2.5", kpaId: "kpa2", title: "Promote green-economy and renewable-energy job creation",                suggestedWeight:  5, defaultOwner: "u_corp" },
+
+  // KPA 3 — Municipal Financial Viability & Management
+  { id: "so_cat_3_1", code: "SO 3.1", kpaId: "kpa3", title: "Reduce outstanding consumer debt",                                       suggestedWeight: 12, defaultOwner: "u_cfo"  },
+  { id: "so_cat_3_2", code: "SO 3.2", kpaId: "kpa3", title: "Achieve an unqualified AGSA audit opinion",                              suggestedWeight:  6, defaultOwner: "u_cfo"  },
+  { id: "so_cat_3_3", code: "SO 3.3", kpaId: "kpa3", title: "Optimise revenue collection mechanisms",                                 suggestedWeight:  8, defaultOwner: "u_cfo"  },
+  { id: "so_cat_3_4", code: "SO 3.4", kpaId: "kpa3", title: "Strengthen mSCOA classification compliance",                             suggestedWeight:  5, defaultOwner: "u_cfo"  },
+  { id: "so_cat_3_5", code: "SO 3.5", kpaId: "kpa3", title: "Implement supply-chain management reforms",                              suggestedWeight:  5, defaultOwner: "u_cfo"  },
+
+  // KPA 4 — Municipal Transformation & Institutional Development
+  { id: "so_cat_4_1", code: "SO 4.1", kpaId: "kpa4", title: "Fill 95% of funded vacant positions",                                    suggestedWeight:  8, defaultOwner: "u_corp" },
+  { id: "so_cat_4_2", code: "SO 4.2", kpaId: "kpa4", title: "Build employee skills and capacity through a training plan",             suggestedWeight:  6, defaultOwner: "u_corp" },
+  { id: "so_cat_4_3", code: "SO 4.3", kpaId: "kpa4", title: "Improve employee health, wellness and safety",                           suggestedWeight:  4, defaultOwner: "u_corp" },
+  { id: "so_cat_4_4", code: "SO 4.4", kpaId: "kpa4", title: "Implement a strategic workforce-planning system",                        suggestedWeight:  5, defaultOwner: "u_corp" },
+  { id: "so_cat_4_5", code: "SO 4.5", kpaId: "kpa4", title: "Transform institutional culture and ethics",                             suggestedWeight:  5, defaultOwner: "u_corp" },
+
+  // KPA 5 — Good Governance & Public Participation
+  { id: "so_cat_5_1", code: "SO 5.1", kpaId: "kpa5", title: "Implement SPoMA-aligned performance management",                         suggestedWeight:  6, defaultOwner: "u_mm"   },
+  { id: "so_cat_5_2", code: "SO 5.2", kpaId: "kpa5", title: "Run quarterly community imbizos in all 19 wards",                        suggestedWeight:  6, defaultOwner: "u_mm"   },
+  { id: "so_cat_5_3", code: "SO 5.3", kpaId: "kpa5", title: "Strengthen council oversight committees and MPAC functioning",           suggestedWeight:  5, defaultOwner: "u_mm"   },
+  { id: "so_cat_5_4", code: "SO 5.4", kpaId: "kpa5", title: "Improve responsiveness to community complaints and queries",             suggestedWeight:  4, defaultOwner: "u_mm"   },
+  { id: "so_cat_5_5", code: "SO 5.5", kpaId: "kpa5", title: "Implement transparency and anti-corruption measures",                    suggestedWeight:  5, defaultOwner: "u_mm"   },
+];
+
 // `weight` is the SO's share of municipal effort/capital (% of org). The sum
 // per KPA must fall inside that KPA's IDP_CYCLE.kpaBands envelope. Totals
 // across all KPAs: 35 + 10 + 18 + 8 + 12 = 83%, leaving headroom for new SOs.
+// `catalogueId` traces back to the master Treasury-circulated entry.
 export const STRATEGIC_OBJECTIVES = [
-  { id: "so1", code: "SO 1.1", kpaId: "kpa1", weight: 15, title: "Provide reliable electricity to all formal households", owner: "u_tech",  status: "On track",     progress: 78, target2027: "100% coverage", baseline2022: "92%", risks: ["risk1","risk2"] },
-  { id: "so2", code: "SO 1.2", kpaId: "kpa1", weight: 10, title: "Maintain ageing electricity infrastructure (NMD reductions)", owner: "u_tech", status: "At risk",  progress: 41, target2027: "Reduce unplanned outages by 60%", baseline2022: "Baseline FY22", risks: ["risk2"] },
-  { id: "so3", code: "SO 1.3", kpaId: "kpa1", weight: 10, title: "Improve refuse collection coverage in informal areas", owner: "u_comm",   status: "On track",     progress: 64, target2027: "85% coverage", baseline2022: "62%", risks: [] },
-  { id: "so4", code: "SO 2.1", kpaId: "kpa2", weight: 10, title: "Promote tourism around Kruger gateway",            owner: "u_corp",   status: "On track",     progress: 55, target2027: "+2,500 jobs",     baseline2022: "Baseline study", risks: ["risk3"] },
-  { id: "so5", code: "SO 3.1", kpaId: "kpa3", weight: 12, title: "Reduce outstanding consumer debt (R487m → R350m)", owner: "u_cfo",    status: "At risk",      progress: 28, target2027: "≤ R350m",         baseline2022: "R487m",          risks: ["risk4","risk5"] },
-  { id: "so6", code: "SO 3.2", kpaId: "kpa3", weight:  6, title: "Achieve unqualified AGSA audit opinion",           owner: "u_cfo",    status: "Behind",       progress: 22, target2027: "Unqualified",     baseline2022: "Qualified",      risks: ["risk6"] },
-  { id: "so7", code: "SO 4.1", kpaId: "kpa4", weight:  8, title: "Fill 95% of funded vacant positions",              owner: "u_corp",   status: "On track",     progress: 71, target2027: "≥ 95%",           baseline2022: "78%",            risks: [] },
-  { id: "so8", code: "SO 5.1", kpaId: "kpa5", weight:  6, title: "Implement SPoMA-aligned performance management",   owner: "u_mm",     status: "On track",     progress: 60, target2027: "100% Section 56 signed", baseline2022: "Manual paper", risks: [] },
-  { id: "so9", code: "SO 5.2", kpaId: "kpa5", weight:  6, title: "Run quarterly community imbizos in all 19 wards",  owner: "u_mm",     status: "On track",     progress: 84, target2027: "76 imbizos / yr", baseline2022: "32 / yr",       risks: [] },
+  { id: "so1", catalogueId: "so_cat_1_1", code: "SO 1.1", kpaId: "kpa1", weight: 15, title: "Provide reliable electricity to all formal households", owner: "u_tech",  status: "On track",     progress: 78, target2027: "100% coverage", baseline2022: "92%", risks: ["risk1","risk2"] },
+  { id: "so2", catalogueId: "so_cat_1_2", code: "SO 1.2", kpaId: "kpa1", weight: 10, title: "Maintain ageing electricity infrastructure (NMD reductions)", owner: "u_tech", status: "At risk",  progress: 41, target2027: "Reduce unplanned outages by 60%", baseline2022: "Baseline FY22", risks: ["risk2"] },
+  { id: "so3", catalogueId: "so_cat_1_3", code: "SO 1.3", kpaId: "kpa1", weight: 10, title: "Improve refuse collection coverage in informal areas", owner: "u_comm",   status: "On track",     progress: 64, target2027: "85% coverage", baseline2022: "62%", risks: [] },
+  { id: "so4", catalogueId: "so_cat_2_1", code: "SO 2.1", kpaId: "kpa2", weight: 10, title: "Promote tourism around Kruger gateway",            owner: "u_corp",   status: "On track",     progress: 55, target2027: "+2,500 jobs",     baseline2022: "Baseline study", risks: ["risk3"] },
+  { id: "so5", catalogueId: "so_cat_3_1", code: "SO 3.1", kpaId: "kpa3", weight: 12, title: "Reduce outstanding consumer debt (R487m → R350m)", owner: "u_cfo",    status: "At risk",      progress: 28, target2027: "≤ R350m",         baseline2022: "R487m",          risks: ["risk4","risk5"] },
+  { id: "so6", catalogueId: "so_cat_3_2", code: "SO 3.2", kpaId: "kpa3", weight:  6, title: "Achieve unqualified AGSA audit opinion",           owner: "u_cfo",    status: "Behind",       progress: 22, target2027: "Unqualified",     baseline2022: "Qualified",      risks: ["risk6"] },
+  { id: "so7", catalogueId: "so_cat_4_1", code: "SO 4.1", kpaId: "kpa4", weight:  8, title: "Fill 95% of funded vacant positions",              owner: "u_corp",   status: "On track",     progress: 71, target2027: "≥ 95%",           baseline2022: "78%",            risks: [] },
+  { id: "so8", catalogueId: "so_cat_5_1", code: "SO 5.1", kpaId: "kpa5", weight:  6, title: "Implement SPoMA-aligned performance management",   owner: "u_mm",     status: "On track",     progress: 60, target2027: "100% Section 56 signed", baseline2022: "Manual paper", risks: [] },
+  { id: "so9", catalogueId: "so_cat_5_2", code: "SO 5.2", kpaId: "kpa5", weight:  6, title: "Run quarterly community imbizos in all 19 wards",  owner: "u_mm",     status: "On track",     progress: 84, target2027: "76 imbizos / yr", baseline2022: "32 / yr",       risks: [] },
+];
+
+// Master Performance-Objective catalogue. Each row decomposes a catalogue SO
+// into measurable targets. Municipalities adopt these alongside the parent SO.
+export const PO_CATALOGUE = [
+  // KPA 1
+  { id: "po_cat_1_1_1", code: "PO 1.1.1", soCatalogueId: "so_cat_1_1", kpaId: "kpa1", title: "Extend the formal electrical reticulation network to all unserved households",                  suggestedWeight: 8, defaultOwner: "u_tech" },
+  { id: "po_cat_1_1_2", code: "PO 1.1.2", soCatalogueId: "so_cat_1_1", kpaId: "kpa1", title: "Audit and replace illegal connections in Namakgale and Lulekani",                              suggestedWeight: 7, defaultOwner: "u_tech" },
+  { id: "po_cat_1_2_1", code: "PO 1.2.1", soCatalogueId: "so_cat_1_2", kpaId: "kpa1", title: "Refurbish the Phalaborwa 22kV substation and replace failing transformers",                    suggestedWeight: 10, defaultOwner: "u_tech" },
+  { id: "po_cat_1_2_2", code: "PO 1.2.2", soCatalogueId: "so_cat_1_2", kpaId: "kpa1", title: "Roll out a planned-maintenance cycle on the medium-voltage reticulation network",              suggestedWeight: 5,  defaultOwner: "u_tech" },
+  { id: "po_cat_1_3_1", code: "PO 1.3.1", soCatalogueId: "so_cat_1_3", kpaId: "kpa1", title: "Extend kerb-side refuse collection to informal settlements in Namakgale and Selwane",         suggestedWeight: 10, defaultOwner: "u_comm" },
+  { id: "po_cat_1_3_2", code: "PO 1.3.2", soCatalogueId: "so_cat_1_3", kpaId: "kpa1", title: "Establish drop-off centres and recycling buy-back facilities",                                 suggestedWeight: 4,  defaultOwner: "u_comm" },
+  { id: "po_cat_1_4_1", code: "PO 1.4.1", soCatalogueId: "so_cat_1_4", kpaId: "kpa1", title: "Construct bulk-water augmentation lines and storage reservoirs",                              suggestedWeight: 8,  defaultOwner: "u_tech" },
+  { id: "po_cat_1_4_2", code: "PO 1.4.2", soCatalogueId: "so_cat_1_4", kpaId: "kpa1", title: "Replace ageing AC water reticulation in legacy townships",                                    suggestedWeight: 5,  defaultOwner: "u_tech" },
+  { id: "po_cat_1_5_1", code: "PO 1.5.1", soCatalogueId: "so_cat_1_5", kpaId: "kpa1", title: "Resurface internal roads to a 5-year planned-maintenance standard",                           suggestedWeight: 6,  defaultOwner: "u_tech" },
+  { id: "po_cat_1_5_2", code: "PO 1.5.2", soCatalogueId: "so_cat_1_5", kpaId: "kpa1", title: "Upgrade gravel roads to surfaced standard in priority wards",                                 suggestedWeight: 4,  defaultOwner: "u_tech" },
+  { id: "po_cat_1_6_1", code: "PO 1.6.1", soCatalogueId: "so_cat_1_6", kpaId: "kpa1", title: "Eradicate the VIP toilet backlog in high-density informal areas",                             suggestedWeight: 6,  defaultOwner: "u_tech" },
+  { id: "po_cat_1_6_2", code: "PO 1.6.2", soCatalogueId: "so_cat_1_6", kpaId: "kpa1", title: "Upgrade the wastewater treatment works to meet DWS effluent standards",                        suggestedWeight: 4,  defaultOwner: "u_tech" },
+
+  // KPA 2
+  { id: "po_cat_2_1_1", code: "PO 2.1.1", soCatalogueId: "so_cat_2_1", kpaId: "kpa2", title: "Develop a Kruger-gateway destination marketing programme with tourism SMMEs",                  suggestedWeight: 6, defaultOwner: "u_corp" },
+  { id: "po_cat_2_1_2", code: "PO 2.1.2", soCatalogueId: "so_cat_2_1", kpaId: "kpa2", title: "Upgrade municipal tourism infrastructure (signage, ablutions, info centres)",                  suggestedWeight: 4, defaultOwner: "u_corp" },
+  { id: "po_cat_2_2_1", code: "PO 2.2.1", soCatalogueId: "so_cat_2_2", kpaId: "kpa2", title: "Operationalise the township SMME incubation centre",                                          suggestedWeight: 4, defaultOwner: "u_corp" },
+  { id: "po_cat_2_2_2", code: "PO 2.2.2", soCatalogueId: "so_cat_2_2", kpaId: "kpa2", title: "Run cooperatives-development workshops in rural wards",                                       suggestedWeight: 2, defaultOwner: "u_corp" },
+  { id: "po_cat_2_3_1", code: "PO 2.3.1", soCatalogueId: "so_cat_2_3", kpaId: "kpa2", title: "Establish a milling and packaging hub for emerging farmers",                                  suggestedWeight: 4, defaultOwner: "u_corp" },
+  { id: "po_cat_2_4_1", code: "PO 2.4.1", soCatalogueId: "so_cat_2_4", kpaId: "kpa2", title: "Service the Phalaborwa industrial park and conclude long-lease agreements",                   suggestedWeight: 5, defaultOwner: "u_corp" },
+  { id: "po_cat_2_5_1", code: "PO 2.5.1", soCatalogueId: "so_cat_2_5", kpaId: "kpa2", title: "Procure rooftop-PV systems for municipal buildings and operationalise wheeling",              suggestedWeight: 4, defaultOwner: "u_corp" },
+
+  // KPA 3
+  { id: "po_cat_3_1_1", code: "PO 3.1.1", soCatalogueId: "so_cat_3_1", kpaId: "kpa3", title: "Roll out smart prepaid metering to high-loss zones (Namakgale + Lulekani)",                    suggestedWeight: 7, defaultOwner: "u_cfo"  },
+  { id: "po_cat_3_1_2", code: "PO 3.1.2", soCatalogueId: "so_cat_3_1", kpaId: "kpa3", title: "Verify and update the indigent register on a quarterly cadence",                              suggestedWeight: 5, defaultOwner: "u_cfo"  },
+  { id: "po_cat_3_2_1", code: "PO 3.2.1", soCatalogueId: "so_cat_3_2", kpaId: "kpa3", title: "Clear prior-year AGSA findings and tighten mSCOA classification at entry",                     suggestedWeight: 6, defaultOwner: "u_cfo"  },
+  { id: "po_cat_3_3_1", code: "PO 3.3.1", soCatalogueId: "so_cat_3_3", kpaId: "kpa3", title: "Modernise the customer-care and billing query channels",                                       suggestedWeight: 4, defaultOwner: "u_cfo"  },
+  { id: "po_cat_3_3_2", code: "PO 3.3.2", soCatalogueId: "so_cat_3_3", kpaId: "kpa3", title: "Run a debt-collection blitz against the top-50 commercial debtors",                            suggestedWeight: 4, defaultOwner: "u_cfo"  },
+  { id: "po_cat_3_4_1", code: "PO 3.4.1", soCatalogueId: "so_cat_3_4", kpaId: "kpa3", title: "Implement seven-segment mSCOA validation at point of journal entry",                           suggestedWeight: 5, defaultOwner: "u_cfo"  },
+  { id: "po_cat_3_5_1", code: "PO 3.5.1", soCatalogueId: "so_cat_3_5", kpaId: "kpa3", title: "Rationalise the SCM panel and shorten procurement cycle times",                                suggestedWeight: 3, defaultOwner: "u_cfo"  },
+
+  // KPA 4
+  { id: "po_cat_4_1_1", code: "PO 4.1.1", soCatalogueId: "so_cat_4_1", kpaId: "kpa4", title: "Reduce vacancy turnaround from 180 to 90 days for funded posts",                              suggestedWeight: 8, defaultOwner: "u_corp" },
+  { id: "po_cat_4_2_1", code: "PO 4.2.1", soCatalogueId: "so_cat_4_2", kpaId: "kpa4", title: "Roll out a Workplace Skills Plan tied to PMDS development objectives",                         suggestedWeight: 4, defaultOwner: "u_corp" },
+  { id: "po_cat_4_2_2", code: "PO 4.2.2", soCatalogueId: "so_cat_4_2", kpaId: "kpa4", title: "Sponsor accredited bursaries for scarce-skills disciplines",                                   suggestedWeight: 2, defaultOwner: "u_corp" },
+  { id: "po_cat_4_3_1", code: "PO 4.3.1", soCatalogueId: "so_cat_4_3", kpaId: "kpa4", title: "Establish an Occupational Health & Safety committee at each work centre",                       suggestedWeight: 4, defaultOwner: "u_corp" },
+  { id: "po_cat_4_4_1", code: "PO 4.4.1", soCatalogueId: "so_cat_4_4", kpaId: "kpa4", title: "Develop a 5-year staff-establishment forecast aligned to the IDP",                              suggestedWeight: 5, defaultOwner: "u_corp" },
+  { id: "po_cat_4_5_1", code: "PO 4.5.1", soCatalogueId: "so_cat_4_5", kpaId: "kpa4", title: "Run institutional ethics campaigns and refresh the fraud-prevention plan",                    suggestedWeight: 5, defaultOwner: "u_corp" },
+
+  // KPA 5
+  { id: "po_cat_5_1_1", code: "PO 5.1.1", soCatalogueId: "so_cat_5_1", kpaId: "kpa5", title: "Implement an electronic performance management system and roll out S56/57 agreements",          suggestedWeight: 6, defaultOwner: "u_mm"   },
+  { id: "po_cat_5_2_1", code: "PO 5.2.1", soCatalogueId: "so_cat_5_2", kpaId: "kpa5", title: "Run quarterly community imbizos in every ward, capture minutes and resolutions",              suggestedWeight: 6, defaultOwner: "u_mm"   },
+  { id: "po_cat_5_3_1", code: "PO 5.3.1", soCatalogueId: "so_cat_5_3", kpaId: "kpa5", title: "Convene the MPAC and Audit committees in line with the council schedule",                       suggestedWeight: 5, defaultOwner: "u_mm"   },
+  { id: "po_cat_5_4_1", code: "PO 5.4.1", soCatalogueId: "so_cat_5_4", kpaId: "kpa5", title: "Acknowledge and resolve community complaints within the service standard",                     suggestedWeight: 4, defaultOwner: "u_mm"   },
+  { id: "po_cat_5_5_1", code: "PO 5.5.1", soCatalogueId: "so_cat_5_5", kpaId: "kpa5", title: "Tabulate executive lifestyle audits and publish the asset-disclosure register",                 suggestedWeight: 5, defaultOwner: "u_mm"   },
 ];
 
 // Performance Objectives — municipal-defined. Each PO is a unique
@@ -171,18 +265,19 @@ export const STRATEGIC_OBJECTIVES = [
 // `weight` is the PO's share of the parent SO's allocation. The sum of PO
 // weights under a single SO must not exceed the parent SO's weight; under-
 // decomposition (sum < parent SO weight) raises a soft warning.
+// `catalogueId` traces back to the master PO catalogue.
 export const PERFORMANCE_OBJECTIVES = [
-  { id: "po1", code: "PO 1.1.1", kpaId: "kpa1", soId: "so1", weight:  8, title: "Extend the formal electrical reticulation network to all unserved households",                  owner: "u_tech" },
-  { id: "po2", code: "PO 1.1.2", kpaId: "kpa1", soId: "so1", weight:  7, title: "Audit and replace illegal connections in Namakgale and Lulekani",                              owner: "u_tech" },
-  { id: "po3", code: "PO 1.2.1", kpaId: "kpa1", soId: "so2", weight: 10, title: "Refurbish the Phalaborwa 22kV substation and replace failing transformers",                    owner: "u_tech" },
-  { id: "po4", code: "PO 1.3.1", kpaId: "kpa1", soId: "so3", weight: 10, title: "Extend kerb-side refuse collection to informal settlements in Namakgale and Selwane",         owner: "u_comm" },
-  { id: "po5", code: "PO 2.1.1", kpaId: "kpa2", soId: "so4", weight: 10, title: "Develop a Kruger-gateway destination marketing programme with tourism SMMEs",                  owner: "u_corp" },
-  { id: "po6", code: "PO 3.1.1", kpaId: "kpa3", soId: "so5", weight:  7, title: "Roll out smart prepaid metering to high-loss zones (Namakgale + Lulekani)",                    owner: "u_cfo"  },
-  { id: "po7", code: "PO 3.1.2", kpaId: "kpa3", soId: "so5", weight:  5, title: "Verify and update the indigent register on a quarterly cadence",                              owner: "u_cfo"  },
-  { id: "po8", code: "PO 3.2.1", kpaId: "kpa3", soId: "so6", weight:  6, title: "Clear prior-year AGSA findings and tighten the seven-segment mSCOA classification at entry", owner: "u_cfo"  },
-  { id: "po9", code: "PO 4.1.1", kpaId: "kpa4", soId: "so7", weight:  8, title: "Reduce vacancy turnaround from 180 to 90 days for funded posts",                              owner: "u_corp" },
-  { id: "po10",code: "PO 5.1.1", kpaId: "kpa5", soId: "so8", weight:  6, title: "Implement an electronic performance management system and roll out Section 56/57 agreements",owner: "u_mm"   },
-  { id: "po11",code: "PO 5.2.1", kpaId: "kpa5", soId: "so9", weight:  6, title: "Run quarterly community imbizos in every ward, capture minutes and resolutions",              owner: "u_mm"   },
+  { id: "po1", catalogueId: "po_cat_1_1_1", code: "PO 1.1.1", kpaId: "kpa1", soId: "so1", weight:  8, title: "Extend the formal electrical reticulation network to all unserved households",                  owner: "u_tech" },
+  { id: "po2", catalogueId: "po_cat_1_1_2", code: "PO 1.1.2", kpaId: "kpa1", soId: "so1", weight:  7, title: "Audit and replace illegal connections in Namakgale and Lulekani",                              owner: "u_tech" },
+  { id: "po3", catalogueId: "po_cat_1_2_1", code: "PO 1.2.1", kpaId: "kpa1", soId: "so2", weight: 10, title: "Refurbish the Phalaborwa 22kV substation and replace failing transformers",                    owner: "u_tech" },
+  { id: "po4", catalogueId: "po_cat_1_3_1", code: "PO 1.3.1", kpaId: "kpa1", soId: "so3", weight: 10, title: "Extend kerb-side refuse collection to informal settlements in Namakgale and Selwane",         owner: "u_comm" },
+  { id: "po5", catalogueId: "po_cat_2_1_1", code: "PO 2.1.1", kpaId: "kpa2", soId: "so4", weight: 10, title: "Develop a Kruger-gateway destination marketing programme with tourism SMMEs",                  owner: "u_corp" },
+  { id: "po6", catalogueId: "po_cat_3_1_1", code: "PO 3.1.1", kpaId: "kpa3", soId: "so5", weight:  7, title: "Roll out smart prepaid metering to high-loss zones (Namakgale + Lulekani)",                    owner: "u_cfo"  },
+  { id: "po7", catalogueId: "po_cat_3_1_2", code: "PO 3.1.2", kpaId: "kpa3", soId: "so5", weight:  5, title: "Verify and update the indigent register on a quarterly cadence",                              owner: "u_cfo"  },
+  { id: "po8", catalogueId: "po_cat_3_2_1", code: "PO 3.2.1", kpaId: "kpa3", soId: "so6", weight:  6, title: "Clear prior-year AGSA findings and tighten the seven-segment mSCOA classification at entry", owner: "u_cfo"  },
+  { id: "po9", catalogueId: "po_cat_4_1_1", code: "PO 4.1.1", kpaId: "kpa4", soId: "so7", weight:  8, title: "Reduce vacancy turnaround from 180 to 90 days for funded posts",                              owner: "u_corp" },
+  { id: "po10",catalogueId: "po_cat_5_1_1", code: "PO 5.1.1", kpaId: "kpa5", soId: "so8", weight:  6, title: "Implement an electronic performance management system and roll out Section 56/57 agreements",owner: "u_mm"   },
+  { id: "po11",catalogueId: "po_cat_5_2_1", code: "PO 5.2.1", kpaId: "kpa5", soId: "so9", weight:  6, title: "Run quarterly community imbizos in every ward, capture minutes and resolutions",              owner: "u_mm"   },
 ];
 
 // Master KPIs — composite of (KPA + SO + PO + SDO + IUDF). This is the
