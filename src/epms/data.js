@@ -128,27 +128,48 @@ export const WARDS = Array.from({ length: 19 }, (_, i) => ({
   ][i],
 }));
 
-// ─── IDP — Strategic Objectives & Risks ──────────────────────────────────────
-// KPA balance envelopes — each KPA must sit within its [min, max] band of
-// total municipal effort (sum of SO weights). Bands are calibrated for a
-// South African Category-B local municipality: KPA 1 carries most weight,
-// KPA 5 the least. Out-of-band totals trigger soft warnings; exceeding the
-// max is a hard block at SO save.
-export const IDP_CYCLE = {
-  id: "idp_2022_27",
-  label: "IDP 2022–2027 (5-year cycle)",
-  reviewYear: "2026/27 Annual Review",
-  mecRating: "High",
-  mecComments: "Credible, well-aligned with NDP. Strengthen monitoring of capital project delivery.",
-  tabledOnCouncil: "2025-05-29",
-  kpaBands: {
-    kpa1: { min: 25, max: 45 }, // Basic Service Delivery & Infrastructure
-    kpa2: { min:  5, max: 20 }, // Local Economic Development
-    kpa3: { min: 10, max: 25 }, // Municipal Financial Viability
-    kpa4: { min:  5, max: 20 }, // Institutional Development
-    kpa5: { min:  5, max: 15 }, // Good Governance & Public Participation
+// ─── IDP cycles ──────────────────────────────────────────────────────────────
+// Each local-government term (5 years) produces one IDP. A cycle starts as
+// "Draft", gets populated with SOs/POs/KPIs, and moves to "Final" once
+// council approves it. Historical cycles are read-only.
+export const IDP_CYCLES = [
+  {
+    id: "idp_2017_22",
+    label: "IDP 2017–2022",
+    term: "2017/18 – 2021/22",
+    reviewYear: "2021/22 Final Review",
+    mecRating: "Moderate",
+    mecComments: "Generally compliant. Infrastructure backlogs remain a concern.",
+    tabledOnCouncil: "2021-05-27",
+    status: "Final",
+    kpaBands: { kpa1: {min:25,max:45}, kpa2: {min:5,max:20}, kpa3: {min:10,max:25}, kpa4: {min:5,max:20}, kpa5: {min:5,max:15} },
   },
-};
+  {
+    id: "idp_2022_27",
+    label: "IDP 2022–2027",
+    term: "2022/23 – 2026/27",
+    reviewYear: "2026/27 Annual Review",
+    mecRating: "High",
+    mecComments: "Credible, well-aligned with NDP. Strengthen monitoring of capital project delivery.",
+    tabledOnCouncil: "2025-05-29",
+    status: "Final",
+    kpaBands: { kpa1: {min:25,max:45}, kpa2: {min:5,max:20}, kpa3: {min:10,max:25}, kpa4: {min:5,max:20}, kpa5: {min:5,max:15} },
+  },
+  {
+    id: "idp_2027_32",
+    label: "IDP 2027–2032",
+    term: "2027/28 – 2031/32",
+    reviewYear: "—",
+    mecRating: "—",
+    mecComments: "",
+    tabledOnCouncil: null,
+    status: "Draft",
+    kpaBands: { kpa1: {min:25,max:45}, kpa2: {min:5,max:20}, kpa3: {min:10,max:25}, kpa4: {min:5,max:20}, kpa5: {min:5,max:15} },
+  },
+];
+
+// Convenience alias — views that need "the current cycle" can grab this.
+export const IDP_CYCLE = IDP_CYCLES.find((c) => c.id === "idp_2022_27");
 
 // Master Strategic-Objective catalogue. National Treasury circulates this menu;
 // municipalities adopt items from it, set weights and owners, and decline
@@ -197,15 +218,19 @@ export const SO_CATALOGUE = [
 // across all KPAs: 35 + 10 + 18 + 8 + 12 = 83%, leaving headroom for new SOs.
 // `catalogueId` traces back to the master Treasury-circulated entry.
 export const STRATEGIC_OBJECTIVES = [
-  { id: "so1", catalogueId: "so_cat_1_1", code: "SO 1.1", kpaId: "kpa1", weight: 15, title: "Provide reliable electricity to all formal households", owner: "u_tech",  status: "On track",     progress: 78, target2027: "100% coverage", baseline2022: "92%", risks: ["risk1","risk2"] },
-  { id: "so2", catalogueId: "so_cat_1_2", code: "SO 1.2", kpaId: "kpa1", weight: 10, title: "Maintain ageing electricity infrastructure (NMD reductions)", owner: "u_tech", status: "At risk",  progress: 41, target2027: "Reduce unplanned outages by 60%", baseline2022: "Baseline FY22", risks: ["risk2"] },
-  { id: "so3", catalogueId: "so_cat_1_3", code: "SO 1.3", kpaId: "kpa1", weight: 10, title: "Improve refuse collection coverage in informal areas", owner: "u_comm",   status: "On track",     progress: 64, target2027: "85% coverage", baseline2022: "62%", risks: [] },
-  { id: "so4", catalogueId: "so_cat_2_1", code: "SO 2.1", kpaId: "kpa2", weight: 10, title: "Promote tourism around Kruger gateway",            owner: "u_corp",   status: "On track",     progress: 55, target2027: "+2,500 jobs",     baseline2022: "Baseline study", risks: ["risk3"] },
-  { id: "so5", catalogueId: "so_cat_3_1", code: "SO 3.1", kpaId: "kpa3", weight: 12, title: "Reduce outstanding consumer debt (R487m → R350m)", owner: "u_cfo",    status: "At risk",      progress: 28, target2027: "≤ R350m",         baseline2022: "R487m",          risks: ["risk4","risk5"] },
-  { id: "so6", catalogueId: "so_cat_3_2", code: "SO 3.2", kpaId: "kpa3", weight:  6, title: "Achieve unqualified AGSA audit opinion",           owner: "u_cfo",    status: "Behind",       progress: 22, target2027: "Unqualified",     baseline2022: "Qualified",      risks: ["risk6"] },
-  { id: "so7", catalogueId: "so_cat_4_1", code: "SO 4.1", kpaId: "kpa4", weight:  8, title: "Fill 95% of funded vacant positions",              owner: "u_corp",   status: "On track",     progress: 71, target2027: "≥ 95%",           baseline2022: "78%",            risks: [] },
-  { id: "so8", catalogueId: "so_cat_5_1", code: "SO 5.1", kpaId: "kpa5", weight:  6, title: "Implement SPoMA-aligned performance management",   owner: "u_mm",     status: "On track",     progress: 60, target2027: "100% Section 56 signed", baseline2022: "Manual paper", risks: [] },
-  { id: "so9", catalogueId: "so_cat_5_2", code: "SO 5.2", kpaId: "kpa5", weight:  6, title: "Run quarterly community imbizos in all 19 wards",  owner: "u_mm",     status: "On track",     progress: 84, target2027: "76 imbizos / yr", baseline2022: "32 / yr",       risks: [] },
+  { id: "so1", cycleId: "idp_2022_27", catalogueId: "so_cat_1_1", code: "SO 1.1", kpaId: "kpa1", weight: 15, title: "Provide reliable electricity to all formal households", owner: "u_tech",  status: "On track",     progress: 78, target2027: "100% coverage", baseline2022: "92%", risks: ["risk1","risk2"] },
+  { id: "so2", cycleId: "idp_2022_27", catalogueId: "so_cat_1_2", code: "SO 1.2", kpaId: "kpa1", weight: 10, title: "Maintain ageing electricity infrastructure (NMD reductions)", owner: "u_tech", status: "At risk",  progress: 41, target2027: "Reduce unplanned outages by 60%", baseline2022: "Baseline FY22", risks: ["risk2"] },
+  { id: "so3", cycleId: "idp_2022_27", catalogueId: "so_cat_1_3", code: "SO 1.3", kpaId: "kpa1", weight: 10, title: "Improve refuse collection coverage in informal areas", owner: "u_comm",   status: "On track",     progress: 64, target2027: "85% coverage", baseline2022: "62%", risks: [] },
+  { id: "so4", cycleId: "idp_2022_27", catalogueId: "so_cat_2_1", code: "SO 2.1", kpaId: "kpa2", weight: 10, title: "Promote tourism around Kruger gateway",            owner: "u_corp",   status: "On track",     progress: 55, target2027: "+2,500 jobs",     baseline2022: "Baseline study", risks: ["risk3"] },
+  { id: "so5", cycleId: "idp_2022_27", catalogueId: "so_cat_3_1", code: "SO 3.1", kpaId: "kpa3", weight: 12, title: "Reduce outstanding consumer debt (R487m → R350m)", owner: "u_cfo",    status: "At risk",      progress: 28, target2027: "≤ R350m",         baseline2022: "R487m",          risks: ["risk4","risk5"] },
+  { id: "so6", cycleId: "idp_2022_27", catalogueId: "so_cat_3_2", code: "SO 3.2", kpaId: "kpa3", weight:  6, title: "Achieve unqualified AGSA audit opinion",           owner: "u_cfo",    status: "Behind",       progress: 22, target2027: "Unqualified",     baseline2022: "Qualified",      risks: ["risk6"] },
+  { id: "so7", cycleId: "idp_2022_27", catalogueId: "so_cat_4_1", code: "SO 4.1", kpaId: "kpa4", weight:  8, title: "Fill 95% of funded vacant positions",              owner: "u_corp",   status: "On track",     progress: 71, target2027: "≥ 95%",           baseline2022: "78%",            risks: [] },
+  { id: "so8", cycleId: "idp_2022_27", catalogueId: "so_cat_5_1", code: "SO 5.1", kpaId: "kpa5", weight:  6, title: "Implement SPoMA-aligned performance management",   owner: "u_mm",     status: "On track",     progress: 60, target2027: "100% Section 56 signed", baseline2022: "Manual paper", risks: [] },
+  { id: "so9", cycleId: "idp_2022_27", catalogueId: "so_cat_5_2", code: "SO 5.2", kpaId: "kpa5", weight:  6, title: "Run quarterly community imbizos in all 19 wards",  owner: "u_mm",     status: "On track",     progress: 84, target2027: "76 imbizos / yr", baseline2022: "32 / yr",       risks: [] },
+  // Historical — IDP 2017–2022 (archived, read-only)
+  { id: "so_h1", cycleId: "idp_2017_22", catalogueId: "so_cat_1_1", code: "SO 1.1", kpaId: "kpa1", weight: 20, title: "Electrify 5,000 households in Namakgale and Lulekani", owner: "u_tech", status: "Completed", progress: 100, target2027: "5,000 connections", baseline2022: "0", risks: [] },
+  { id: "so_h2", cycleId: "idp_2017_22", catalogueId: "so_cat_3_2", code: "SO 3.1", kpaId: "kpa3", weight: 15, title: "Reduce qualified audit findings by 50%",               owner: "u_cfo",  status: "Completed", progress: 85,  target2027: "≤ 6 findings",     baseline2022: "12 findings", risks: [] },
+  { id: "so_h3", cycleId: "idp_2017_22", catalogueId: "so_cat_5_2", code: "SO 5.1", kpaId: "kpa5", weight: 10, title: "Establish ward-committee imbizo programme",             owner: "u_mm",   status: "Completed", progress: 100, target2027: "32 imbizos / yr",  baseline2022: "8 / yr",      risks: [] },
 ];
 
 // Master Performance-Objective catalogue. Each row decomposes a catalogue SO
@@ -267,15 +292,15 @@ export const PO_CATALOGUE = [
 // decomposition (sum < parent SO weight) raises a soft warning.
 // `catalogueId` traces back to the master PO catalogue.
 export const PERFORMANCE_OBJECTIVES = [
-  { id: "po1", catalogueId: "po_cat_1_1_1", code: "PO 1.1.1", kpaId: "kpa1", soId: "so1", weight:  8, title: "Extend the formal electrical reticulation network to all unserved households",                  owner: "u_tech" },
-  { id: "po2", catalogueId: "po_cat_1_1_2", code: "PO 1.1.2", kpaId: "kpa1", soId: "so1", weight:  7, title: "Audit and replace illegal connections in Namakgale and Lulekani",                              owner: "u_tech" },
-  { id: "po3", catalogueId: "po_cat_1_2_1", code: "PO 1.2.1", kpaId: "kpa1", soId: "so2", weight: 10, title: "Refurbish the Phalaborwa 22kV substation and replace failing transformers",                    owner: "u_tech" },
-  { id: "po4", catalogueId: "po_cat_1_3_1", code: "PO 1.3.1", kpaId: "kpa1", soId: "so3", weight: 10, title: "Extend kerb-side refuse collection to informal settlements in Namakgale and Selwane",         owner: "u_comm" },
-  { id: "po5", catalogueId: "po_cat_2_1_1", code: "PO 2.1.1", kpaId: "kpa2", soId: "so4", weight: 10, title: "Develop a Kruger-gateway destination marketing programme with tourism SMMEs",                  owner: "u_corp" },
-  { id: "po6", catalogueId: "po_cat_3_1_1", code: "PO 3.1.1", kpaId: "kpa3", soId: "so5", weight:  7, title: "Roll out smart prepaid metering to high-loss zones (Namakgale + Lulekani)",                    owner: "u_cfo"  },
-  { id: "po7", catalogueId: "po_cat_3_1_2", code: "PO 3.1.2", kpaId: "kpa3", soId: "so5", weight:  5, title: "Verify and update the indigent register on a quarterly cadence",                              owner: "u_cfo"  },
-  { id: "po8", catalogueId: "po_cat_3_2_1", code: "PO 3.2.1", kpaId: "kpa3", soId: "so6", weight:  6, title: "Clear prior-year AGSA findings and tighten the seven-segment mSCOA classification at entry", owner: "u_cfo"  },
-  { id: "po9", catalogueId: "po_cat_4_1_1", code: "PO 4.1.1", kpaId: "kpa4", soId: "so7", weight:  8, title: "Reduce vacancy turnaround from 180 to 90 days for funded posts",                              owner: "u_corp" },
+  { id: "po1", cycleId: "idp_2022_27", catalogueId: "po_cat_1_1_1", code: "PO 1.1.1", kpaId: "kpa1", soId: "so1", weight:  8, title: "Extend the formal electrical reticulation network to all unserved households",                  owner: "u_tech" },
+  { id: "po2", cycleId: "idp_2022_27", catalogueId: "po_cat_1_1_2", code: "PO 1.1.2", kpaId: "kpa1", soId: "so1", weight:  7, title: "Audit and replace illegal connections in Namakgale and Lulekani",                              owner: "u_tech" },
+  { id: "po3", cycleId: "idp_2022_27", catalogueId: "po_cat_1_2_1", code: "PO 1.2.1", kpaId: "kpa1", soId: "so2", weight: 10, title: "Refurbish the Phalaborwa 22kV substation and replace failing transformers",                    owner: "u_tech" },
+  { id: "po4", cycleId: "idp_2022_27", catalogueId: "po_cat_1_3_1", code: "PO 1.3.1", kpaId: "kpa1", soId: "so3", weight: 10, title: "Extend kerb-side refuse collection to informal settlements in Namakgale and Selwane",         owner: "u_comm" },
+  { id: "po5", cycleId: "idp_2022_27", catalogueId: "po_cat_2_1_1", code: "PO 2.1.1", kpaId: "kpa2", soId: "so4", weight: 10, title: "Develop a Kruger-gateway destination marketing programme with tourism SMMEs",                  owner: "u_corp" },
+  { id: "po6", cycleId: "idp_2022_27", catalogueId: "po_cat_3_1_1", code: "PO 3.1.1", kpaId: "kpa3", soId: "so5", weight:  7, title: "Roll out smart prepaid metering to high-loss zones (Namakgale + Lulekani)",                    owner: "u_cfo"  },
+  { id: "po7", cycleId: "idp_2022_27", catalogueId: "po_cat_3_1_2", code: "PO 3.1.2", kpaId: "kpa3", soId: "so5", weight:  5, title: "Verify and update the indigent register on a quarterly cadence",                              owner: "u_cfo"  },
+  { id: "po8", cycleId: "idp_2022_27", catalogueId: "po_cat_3_2_1", code: "PO 3.2.1", kpaId: "kpa3", soId: "so6", weight:  6, title: "Clear prior-year AGSA findings and tighten the seven-segment mSCOA classification at entry", owner: "u_cfo"  },
+  { id: "po9", cycleId: "idp_2022_27", catalogueId: "po_cat_4_1_1", code: "PO 4.1.1", kpaId: "kpa4", soId: "so7", weight:  8, title: "Reduce vacancy turnaround from 180 to 90 days for funded posts",                              owner: "u_corp" },
   { id: "po10",catalogueId: "po_cat_5_1_1", code: "PO 5.1.1", kpaId: "kpa5", soId: "so8", weight:  6, title: "Implement an electronic performance management system and roll out Section 56/57 agreements",owner: "u_mm"   },
   { id: "po11",catalogueId: "po_cat_5_2_1", code: "PO 5.2.1", kpaId: "kpa5", soId: "so9", weight:  6, title: "Run quarterly community imbizos in every ward, capture minutes and resolutions",              owner: "u_mm"   },
 ];
@@ -284,25 +309,25 @@ export const PERFORMANCE_OBJECTIVES = [
 // "Master IDP key" used for Treasury portal uploads (Munsoft 7.3.2 §A).
 // Each row is the leaf indicator that SDBIP targets and projects bind to.
 export const MASTER_KPIS = [
-  { id: "kpi1",  code: "KPI 1.1.1",  kpaId: "kpa1", soId: "so1", poId: "po1", sdoId: "sdo8",  iudfId: "iudf2", projectCategory: "infra",     fy: "2026/27",
+  { id: "kpi1", cycleId: "idp_2022_27", code: "KPI 1.1.1",  kpaId: "kpa1", soId: "so1", poId: "po1", sdoId: "sdo8",  iudfId: "iudf2", projectCategory: "infra",     fy: "2026/27",
     title: "% of formal households with grid-connected electricity",                            unit: "%",          target: 100, baseline: 92,  owner: "u_tech" },
-  { id: "kpi2",  code: "KPI 1.2.1",  kpaId: "kpa1", soId: "so2", poId: "po3", sdoId: "sdo6",  iudfId: "iudf1", projectCategory: "infra",     fy: "2026/27",
+  { id: "kpi2", cycleId: "idp_2022_27", code: "KPI 1.2.1",  kpaId: "kpa1", soId: "so2", poId: "po3", sdoId: "sdo6",  iudfId: "iudf1", projectCategory: "infra",     fy: "2026/27",
     title: "Number of substation transformers refurbished / replaced",                          unit: "units",      target: 6,   baseline: 0,   owner: "u_tech" },
-  { id: "kpi3",  code: "KPI 1.3.1",  kpaId: "kpa1", soId: "so3", poId: "po4", sdoId: "sdo10", iudfId: "iudf2", projectCategory: "infra",     fy: "2026/27",
+  { id: "kpi3", cycleId: "idp_2022_27", code: "KPI 1.3.1",  kpaId: "kpa1", soId: "so3", poId: "po4", sdoId: "sdo10", iudfId: "iudf2", projectCategory: "infra",     fy: "2026/27",
     title: "% of informal households receiving weekly refuse collection",                       unit: "%",          target: 85,  baseline: 62,  owner: "u_comm" },
-  { id: "kpi4",  code: "KPI 2.1.1",  kpaId: "kpa2", soId: "so4", poId: "po5", sdoId: "sdo4",  iudfId: "iudf3", projectCategory: "led",       fy: "2026/27",
+  { id: "kpi4", cycleId: "idp_2022_27", code: "KPI 2.1.1",  kpaId: "kpa2", soId: "so4", poId: "po5", sdoId: "sdo4",  iudfId: "iudf3", projectCategory: "led",       fy: "2026/27",
     title: "Net new tourism-sector jobs facilitated",                                            unit: "jobs",       target: 2500,baseline: 0,   owner: "u_corp" },
-  { id: "kpi5",  code: "KPI 3.1.1",  kpaId: "kpa3", soId: "so5", poId: "po6", sdoId: "sdo9",  iudfId: "iudf4", projectCategory: "finance",   fy: "2026/27",
+  { id: "kpi5", cycleId: "idp_2022_27", code: "KPI 3.1.1",  kpaId: "kpa3", soId: "so5", poId: "po6", sdoId: "sdo9",  iudfId: "iudf4", projectCategory: "finance",   fy: "2026/27",
     title: "Smart prepaid meters installed (Namakgale + Lulekani)",                              unit: "meters",     target: 3500,baseline: 0,   owner: "u_cfo"  },
-  { id: "kpi6",  code: "KPI 3.1.2",  kpaId: "kpa3", soId: "so5", poId: "po7", sdoId: "sdo9",  iudfId: "iudf4", projectCategory: "finance",   fy: "2026/27",
+  { id: "kpi6", cycleId: "idp_2022_27", code: "KPI 3.1.2",  kpaId: "kpa3", soId: "so5", poId: "po7", sdoId: "sdo9",  iudfId: "iudf4", projectCategory: "finance",   fy: "2026/27",
     title: "Indigent register verification — % wards covered per quarter",                       unit: "%",          target: 100, baseline: 60,  owner: "u_cfo"  },
-  { id: "kpi7",  code: "KPI 3.2.1",  kpaId: "kpa3", soId: "so6", poId: "po8", sdoId: "sdo12", iudfId: "iudf4", projectCategory: "finance",   fy: "2026/27",
+  { id: "kpi7", cycleId: "idp_2022_27", code: "KPI 3.2.1",  kpaId: "kpa3", soId: "so6", poId: "po8", sdoId: "sdo12", iudfId: "iudf4", projectCategory: "finance",   fy: "2026/27",
     title: "AGSA findings cleared from prior year",                                              unit: "findings",   target: 35,  baseline: 0,   owner: "u_cfo"  },
-  { id: "kpi8",  code: "KPI 4.1.1",  kpaId: "kpa4", soId: "so7", poId: "po9", sdoId: "sdo12", iudfId: "iudf4", projectCategory: "governance",fy: "2026/27",
+  { id: "kpi8", cycleId: "idp_2022_27", code: "KPI 4.1.1",  kpaId: "kpa4", soId: "so7", poId: "po9", sdoId: "sdo12", iudfId: "iudf4", projectCategory: "governance",fy: "2026/27",
     title: "% of funded vacant posts filled within 90 days",                                     unit: "%",          target: 95,  baseline: 78,  owner: "u_corp" },
-  { id: "kpi9",  code: "KPI 5.1.1",  kpaId: "kpa5", soId: "so8", poId: "po10",sdoId: "sdo9",  iudfId: "iudf4", projectCategory: "governance",fy: "2026/27",
+  { id: "kpi9", cycleId: "idp_2022_27", code: "KPI 5.1.1",  kpaId: "kpa5", soId: "so8", poId: "po10",sdoId: "sdo9",  iudfId: "iudf4", projectCategory: "governance",fy: "2026/27",
     title: "% of Section 56 performance agreements signed by 30 Aug",                            unit: "%",          target: 100, baseline: 0,   owner: "u_mm"   },
-  { id: "kpi10", code: "KPI 5.2.1",  kpaId: "kpa5", soId: "so9", poId: "po11",sdoId: "sdo14", iudfId: "iudf2", projectCategory: "social",    fy: "2026/27",
+  { id: "kpi10", cycleId: "idp_2022_27", code: "KPI 5.2.1",  kpaId: "kpa5", soId: "so9", poId: "po11",sdoId: "sdo14", iudfId: "iudf2", projectCategory: "social",    fy: "2026/27",
     title: "Community imbizos held per ward per year",                                           unit: "imbizos",    target: 76,  baseline: 32,  owner: "u_mm"   },
 ];
 
@@ -317,19 +342,21 @@ export const STRATEGIC_RISKS = [
 ];
 
 // ─── SDBIP — quarterly targets cascade ────────────────────────────────────────
-// One row per departmental SDBIP target. Each links up to a Strategic Objective
-// and out to mSCOA project / ward. Quarterly projections sum to annual.
+// The SDBIP is a FY-scoped selection of IDP Master KPIs. Each row links to
+// a Master KPI (`kpiId`) and adds quarterly projections, ward assignments,
+// and an mSCOA project binding. sd5 has no kpiId (gap: no Master KPI for
+// aggregate-debt reduction yet — demonstrates the "needs a KPI" state).
 export const SDBIP_TARGETS = [
-  { id: "sd1", code: "SD-T-001", soId: "so1", department: "tech",    indicator: "Households connected to electricity",        unit: "households", q1: 250, q2: 250, q3: 250, q4: 250, ytd: 612, annual: 1000, mscoaProject: "EL-CAP-2026-001", wards: ["w2","w4","w5"], owner: "u_tech",  status: "On track" },
-  { id: "sd2", code: "SD-T-002", soId: "so2", department: "tech",    indicator: "Substation transformers refurbished",         unit: "units",      q1: 1,   q2: 1,   q3: 2,   q4: 2,   ytd: 1,   annual: 6,    mscoaProject: "EL-CAP-2026-002", wards: ["w1","w14"],         owner: "u_tech",  status: "Behind" },
-  { id: "sd3", code: "SD-T-003", soId: "so3", department: "comm",    indicator: "Households receiving weekly refuse collection",unit: "%",         q1: 65,  q2: 70,  q3: 78,  q4: 85,  ytd: 71,  annual: 85,   mscoaProject: "WS-OPEX-2026-001",wards: WARDS.map(w => w.id), owner: "u_comm",  status: "On track" },
-  { id: "sd4", code: "SD-T-004", soId: "so4", department: "ldp",     indicator: "Tourism-sector jobs facilitated",             unit: "jobs",       q1: 200, q2: 250, q3: 300, q4: 400, ytd: 380, annual: 1150, mscoaProject: "LED-OPEX-2026-001",wards: ["w1","w15"],        owner: "u_corp",  status: "On track" },
-  { id: "sd5", code: "SD-T-005", soId: "so5", department: "finance", indicator: "Outstanding consumer debt reduction",         unit: "R million",  q1: 487, q2: 460, q3: 430, q4: 410, ytd: 471, annual: 410,  mscoaProject: "REV-COL-2026-001",wards: WARDS.map(w => w.id), owner: "u_cfo",   status: "At risk" },
-  { id: "sd6", code: "SD-T-006", soId: "so5", department: "finance", indicator: "Smart meters installed (Namakgale + Lulekani)",unit: "meters",    q1: 500, q2: 800, q3: 1000,q4: 1200,ytd: 420, annual: 3500, mscoaProject: "REV-COL-2026-002",wards: ["w2","w3","w4","w5","w6","w7"], owner: "u_cfo", status: "Behind" },
-  { id: "sd7", code: "SD-T-007", soId: "so6", department: "finance", indicator: "Audit findings cleared from prior year",      unit: "findings",   q1: 5,   q2: 8,   q3: 10,  q4: 12,  ytd: 4,   annual: 35,   mscoaProject: "FIN-OPEX-2026-001",wards: [],                  owner: "u_cfo",   status: "Behind" },
-  { id: "sd8", code: "SD-T-008", soId: "so7", department: "corp",    indicator: "Funded vacant posts filled within 90 days",   unit: "%",          q1: 65,  q2: 75,  q3: 85,  q4: 95,  ytd: 71,  annual: 95,   mscoaProject: "HR-OPEX-2026-001", wards: [],                  owner: "u_corp",  status: "On track" },
-  { id: "sd9", code: "SD-T-009", soId: "so8", department: "office_mm", indicator: "Section 56 performance agreements signed",  unit: "%",          q1: 100, q2: 100, q3: 100, q4: 100, ytd: 90,  annual: 100,  mscoaProject: "MM-OPEX-2026-001", wards: [],                  owner: "u_mm",    status: "At risk" },
-  { id: "sd10",code: "SD-T-010", soId: "so9", department: "office_mm", indicator: "Community imbizos held (per ward)",         unit: "imbizos",    q1: 19,  q2: 19,  q3: 19,  q4: 19,  ytd: 16,  annual: 76,   mscoaProject: "MM-OPEX-2026-002", wards: WARDS.map(w => w.id), owner: "u_mm",   status: "On track" },
+  { id: "sd1", code: "SD-T-001", kpiId: "kpi1",  soId: "so1", department: "tech",    indicator: "Households connected to electricity",        unit: "households", q1: 250, q2: 250, q3: 250, q4: 250, ytd: 612, annual: 1000, mscoaProject: "EL-CAP-2026-001", wards: ["w2","w4","w5"], owner: "u_tech",  status: "On track" },
+  { id: "sd2", code: "SD-T-002", kpiId: "kpi2",  soId: "so2", department: "tech",    indicator: "Substation transformers refurbished",         unit: "units",      q1: 1,   q2: 1,   q3: 2,   q4: 2,   ytd: 1,   annual: 6,    mscoaProject: "EL-CAP-2026-002", wards: ["w1","w14"],         owner: "u_tech",  status: "Behind" },
+  { id: "sd3", code: "SD-T-003", kpiId: "kpi3",  soId: "so3", department: "comm",    indicator: "Households receiving weekly refuse collection",unit: "%",         q1: 65,  q2: 70,  q3: 78,  q4: 85,  ytd: 71,  annual: 85,   mscoaProject: "WS-OPEX-2026-001",wards: WARDS.map(w => w.id), owner: "u_comm",  status: "On track" },
+  { id: "sd4", code: "SD-T-004", kpiId: "kpi4",  soId: "so4", department: "ldp",     indicator: "Tourism-sector jobs facilitated",             unit: "jobs",       q1: 200, q2: 250, q3: 300, q4: 400, ytd: 380, annual: 1150, mscoaProject: "LED-OPEX-2026-001",wards: ["w1","w15"],        owner: "u_corp",  status: "On track" },
+  { id: "sd5", code: "SD-T-005", kpiId: null,    soId: "so5", department: "finance", indicator: "Outstanding consumer debt reduction",         unit: "R million",  q1: 487, q2: 460, q3: 430, q4: 410, ytd: 471, annual: 410,  mscoaProject: "REV-COL-2026-001",wards: WARDS.map(w => w.id), owner: "u_cfo",   status: "At risk" },
+  { id: "sd6", code: "SD-T-006", kpiId: "kpi5",  soId: "so5", department: "finance", indicator: "Smart meters installed (Namakgale + Lulekani)",unit: "meters",    q1: 500, q2: 800, q3: 1000,q4: 1200,ytd: 420, annual: 3500, mscoaProject: "REV-COL-2026-002",wards: ["w2","w3","w4","w5","w6","w7"], owner: "u_cfo", status: "Behind" },
+  { id: "sd7", code: "SD-T-007", kpiId: "kpi7",  soId: "so6", department: "finance", indicator: "Audit findings cleared from prior year",      unit: "findings",   q1: 5,   q2: 8,   q3: 10,  q4: 12,  ytd: 4,   annual: 35,   mscoaProject: "FIN-OPEX-2026-001",wards: [],                  owner: "u_cfo",   status: "Behind" },
+  { id: "sd8", code: "SD-T-008", kpiId: "kpi8",  soId: "so7", department: "corp",    indicator: "Funded vacant posts filled within 90 days",   unit: "%",          q1: 65,  q2: 75,  q3: 85,  q4: 95,  ytd: 71,  annual: 95,   mscoaProject: "HR-OPEX-2026-001", wards: [],                  owner: "u_corp",  status: "On track" },
+  { id: "sd9", code: "SD-T-009", kpiId: "kpi9",  soId: "so8", department: "office_mm", indicator: "Section 56 performance agreements signed",  unit: "%",          q1: 100, q2: 100, q3: 100, q4: 100, ytd: 90,  annual: 100,  mscoaProject: "MM-OPEX-2026-001", wards: [],                  owner: "u_mm",    status: "At risk" },
+  { id: "sd10",code: "SD-T-010", kpiId: "kpi10", soId: "so9", department: "office_mm", indicator: "Community imbizos held (per ward)",         unit: "imbizos",    q1: 19,  q2: 19,  q3: 19,  q4: 19,  ytd: 16,  annual: 76,   mscoaProject: "MM-OPEX-2026-002", wards: WARDS.map(w => w.id), owner: "u_mm",   status: "On track" },
 ];
 
 // ─── mSCOA — recent transactions across all 7 segments ────────────────────────

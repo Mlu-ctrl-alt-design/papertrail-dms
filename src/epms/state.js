@@ -4,7 +4,7 @@
 import { createContext, useReducer } from "react";
 import {
   STRATEGIC_OBJECTIVES, STRATEGIC_RISKS,
-  PERFORMANCE_OBJECTIVES, MASTER_KPIS,
+  PERFORMANCE_OBJECTIVES, MASTER_KPIS, IDP_CYCLES,
   SDBIP_TARGETS, MSCOA_TRANSACTIONS, CAPITAL_PROJECTS,
   PERFORMANCE_AGREEMENTS, INDIVIDUAL_KPIS,
   POE_DOCUMENTS, COMPLIANCE_DEADLINES, ACTIVITY,
@@ -14,6 +14,7 @@ import {
 export const EPMSContext = createContext(null);
 
 export const initialState = {
+  idpCycles: IDP_CYCLES,
   objectives: STRATEGIC_OBJECTIVES,
   performanceObjectives: PERFORMANCE_OBJECTIVES,
   masterKpis: MASTER_KPIS,
@@ -103,6 +104,12 @@ export function epmsReducer(state, action) {
         masterKpis: [action.kpi, ...state.masterKpis],
       }, { userId: state.currentUser.id, action: "Created Master KPI", target: action.kpi.code });
 
+    case "ADD_SDBIP_TARGET":
+      return logActivity({
+        ...state,
+        sdbipTargets: [action.target, ...state.sdbipTargets],
+      }, { userId: state.currentUser.id, action: "Added KPI to SDBIP", target: action.target.code });
+
     // Roll-forward: clone the selected Master KPIs to a target fiscal year.
     // Used at FY changeover to preserve mappings (Munsoft 7.3.2 §E "Copy KPIs").
     case "COPY_KPIS_FY": {
@@ -123,6 +130,20 @@ export function epmsReducer(state, action) {
         complianceDeadlines: state.complianceDeadlines.map((c) =>
           c.id === action.id ? { ...c, status: action.status } : c),
       }, { userId: state.currentUser.id, action: `Compliance → ${action.status}`, target: action.id });
+
+    case "CREATE_IDP_CYCLE":
+      return logActivity({
+        ...state,
+        idpCycles: [...state.idpCycles, action.cycle],
+      }, { userId: state.currentUser.id, action: "Created IDP cycle", target: action.cycle.label });
+
+    // IDP cycle status — Draft → Final (council approval).
+    case "APPROVE_IDP_CYCLE":
+      return logActivity({
+        ...state,
+        idpCycles: state.idpCycles.map((c) =>
+          c.id === action.cycleId ? { ...c, status: "Final", tabledOnCouncil: new Date().toISOString().split("T")[0] } : c),
+      }, { userId: state.currentUser.id, action: "Council approved IDP", target: action.cycleId });
 
     // Persona switcher — used by the demo TopBar to swap which user is "logged
     // in." This affects sidebar nav (row-level access), the dashboard

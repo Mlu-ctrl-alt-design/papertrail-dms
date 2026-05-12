@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { Dismiss20Regular } from "@fluentui/react-icons";
+import { Dismiss20Regular, ChevronLeft20Regular, ChevronRight20Regular } from "@fluentui/react-icons";
 import { I } from "./Icon.jsx";
 import { C, SHADOW } from "./tokens.js";
 
@@ -43,12 +43,17 @@ export function Modal({ title, onClose, children, width = 480, footer }) {
 }
 
 // ─── Drawer (Fluent 2 slide-over from the right) ──────────────────────────────
-export function Drawer({ onClose, width = 620, children }) {
+export function Drawer({ onClose, width = 620, children, onPrev, onNext }) {
   useEffect(() => {
-    const h = (e) => { if (e.key === "Escape") onClose(); };
+    const h = (e) => {
+      if (e.key === "Escape") onClose();
+      if (e.key === "ArrowLeft" && onPrev) onPrev();
+      if (e.key === "ArrowRight" && onNext) onNext();
+    };
     document.addEventListener("keydown", h);
     return () => document.removeEventListener("keydown", h);
-  }, [onClose]);
+  }, [onClose, onPrev, onNext]);
+  const hasNav = onPrev || onNext;
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 4500 }}>
       <div onClick={onClose} style={{
@@ -57,10 +62,33 @@ export function Drawer({ onClose, width = 620, children }) {
       }}/>
       <div className="slide-left" style={{
         position: "absolute", right: 0, top: 0, bottom: 0,
-        width, maxWidth: "95vw", background: "#fff",
+        width, maxWidth: "45vw", background: "#fff",
         boxShadow: SHADOW.drawer,
         display: "flex", flexDirection: "column", overflow: "hidden",
-      }}>{children}</div>
+      }}>
+        {hasNav && (
+          <div style={{
+            display: "flex", justifyContent: "space-between", alignItems: "center",
+            padding: "6px 12px", borderBottom: `1px solid ${C.hairline}`,
+            background: C.surfaceAlt, flexShrink: 0,
+          }}>
+            <button disabled={!onPrev} onClick={onPrev} style={{
+              background: "none", border: "none", cursor: onPrev ? "pointer" : "not-allowed",
+              color: onPrev ? C.text : C.faint, display: "inline-flex", alignItems: "center",
+              gap: 4, fontSize: 11, fontWeight: 600, fontFamily: "inherit", padding: "4px 8px",
+              borderRadius: 4, opacity: onPrev ? 1 : 0.4,
+            }}><I as={ChevronLeft20Regular} size={14}/> Prev</button>
+            <span style={{ fontSize: 10, color: C.faint }}>← →</span>
+            <button disabled={!onNext} onClick={onNext} style={{
+              background: "none", border: "none", cursor: onNext ? "pointer" : "not-allowed",
+              color: onNext ? C.text : C.faint, display: "inline-flex", alignItems: "center",
+              gap: 4, fontSize: 11, fontWeight: 600, fontFamily: "inherit", padding: "4px 8px",
+              borderRadius: 4, opacity: onNext ? 1 : 0.4,
+            }}>Next <I as={ChevronRight20Regular} size={14}/></button>
+          </div>
+        )}
+        {children}
+      </div>
     </div>
   );
 }

@@ -9,7 +9,7 @@
 
 import { useContext, useState } from "react";
 import {
-  Flag20Regular, LockClosed20Regular, Add20Regular,
+  Flag20Regular, LockClosed20Regular, Add20Regular, ArrowLeft20Regular,
   Edit20Regular, ArrowDownload20Regular, CopyArrowRight20Regular,
   Dismiss20Regular, ClipboardTextLtr20Regular, CheckmarkCircle20Filled,
   ArrowRight20Regular, Sparkle20Regular, GlobeShield20Regular,
@@ -26,7 +26,7 @@ import {
   KPAS, SERVICE_DELIVERY_OUTCOMES, IUDF_OUTCOMES,
   PROJECT_CATEGORIES, PROJECT_CATEGORY_RULES,
   SO_CATALOGUE, PO_CATALOGUE,
-  IDP_CYCLE, userById,
+  IDP_CYCLE, IDP_CYCLES, userById,
 } from "../data.js";
 import {
   kpaWeight, soWeight, kpaBandStatus,
@@ -167,7 +167,7 @@ function WeightHint({ kind = "kpa", label, current, projected, max, blocked }) {
       color: C.ink, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap",
     }}>
       <strong style={{ color: tone }}>
-        {kind === "kpa" ? "KPA" : "SO"} {label}:
+        {label}:
       </strong>
       <span style={{ color: C.muted }}>{current}% → <strong style={{ color: tone }}>{projected}%</strong> (max {max}%)</span>
       {blocked && (
@@ -504,11 +504,12 @@ function ModeToggle({ mode, setMode }) {
   );
 }
 
-function NewSOForm({ defaultKpaId, defaultCatalogueId, onClose, onCreated }) {
+function NewSOForm({ defaultKpaId, defaultCatalogueId, cycleId, cycleBands, onClose, onCreated }) {
   const { state, dispatch } = useContext(EPMSContext);
   const toast = useToast();
+  const cycleObjectives = state.objectives.filter((o) => o.cycleId === cycleId);
   const [mode, setMode] = useState(defaultCatalogueId ? "adopt" : "adopt");
-  const adoptedIds = new Set(state.objectives.map((o) => o.catalogueId).filter(Boolean));
+  const adoptedIds = new Set(cycleObjectives.map((o) => o.catalogueId).filter(Boolean));
   const [catalogueId, setCatalogueId] = useState(defaultCatalogueId || "");
 
   // Custom-mode fields (only used when mode === "custom")
@@ -532,17 +533,18 @@ function NewSOForm({ defaultKpaId, defaultCatalogueId, onClose, onCreated }) {
     }
   };
 
-  // Live KPA envelope check.
+  // Live KPA envelope check — scoped to this cycle only.
   const w = parseInt(weight, 10) || 0;
+  const bands = cycleBands || IDP_CYCLE.kpaBands;
   const status = kpaId
-    ? kpaBandStatus(kpaId, state.objectives, IDP_CYCLE.kpaBands, w)
+    ? kpaBandStatus(kpaId, cycleObjectives, bands, w)
     : null;
   const blocked = status?.state === "over";
 
   // Sort catalogue: uncovered KPAs first, then by code.
   const catalogueRows = SO_CATALOGUE.map((c) => {
     const adopted = adoptedIds.has(c.id);
-    const kpaHasNoSO = state.objectives.filter((o) => o.kpaId === c.kpaId).length === 0;
+    const kpaHasNoSO = cycleObjectives.filter((o) => o.kpaId === c.kpaId).length === 0;
     return { ...c, adopted, kpaHasNoSO };
   }).sort((a, b) => {
     if (a.adopted !== b.adopted) return a.adopted ? 1 : -1;
@@ -576,6 +578,7 @@ function NewSOForm({ defaultKpaId, defaultCatalogueId, onClose, onCreated }) {
     }
     const so = {
       id: `so_${Date.now()}`,
+      cycleId,
       catalogueId: mode === "adopt" ? catalogueId : null,
       code: useCode, title: useTitle,
       kpaId: useKpaId, owner, weight: w,
@@ -701,10 +704,11 @@ function NewSOForm({ defaultKpaId, defaultCatalogueId, onClose, onCreated }) {
   );
 }
 
-function NewPOForm({ defaultSoId, onClose, onCreated }) {
+function NewPOForm({ defaultSoId, cycleId, onClose, onCreated }) {
   const { state, dispatch } = useContext(EPMSContext);
   const toast = useToast();
-  const sos = state.objectives;
+  const sos = state.objectives.filter((o) => o.cycleId === cycleId);
+  const cyclePOs = state.performanceObjectives.filter((p) => p.cycleId === cycleId);
   const [mode, setMode] = useState("adopt");
   const [soId, setSoId] = useState(defaultSoId || "");
   const [catalogueId, setCatalogueId] = useState("");
@@ -715,7 +719,7 @@ function NewPOForm({ defaultSoId, onClose, onCreated }) {
 
   const parentSO = sos.find((o) => o.id === soId);
   const w = parseInt(weight, 10) || 0;
-  const soAllocated = parentSO ? soWeight(parentSO.id, state.performanceObjectives) : 0;
+  const soAllocated = parentSO ? soWeight(parentSO.id, cyclePOs) : 0;
   const soMax = parentSO ? (parentSO.weight || 0) : 0;
   const projected = soAllocated + w;
   const blocked = parentSO && projected > soMax;
@@ -723,7 +727,7 @@ function NewPOForm({ defaultSoId, onClose, onCreated }) {
 
   // PO catalogue filtered to the parent SO's catalogue entry, with already-
   // adopted items flagged.
-  const adoptedPOIds = new Set(state.performanceObjectives.map((p) => p.catalogueId).filter(Boolean));
+  const adoptedPOIds = new Set(cyclePOs.map((p) => p.catalogueId).filter(Boolean));
   const catalogueRows = parentSO?.catalogueId
     ? PO_CATALOGUE.filter((p) => p.soCatalogueId === parentSO.catalogueId)
         .map((p) => ({ ...p, adopted: adoptedPOIds.has(p.id) }))
@@ -765,6 +769,7 @@ function NewPOForm({ defaultSoId, onClose, onCreated }) {
     }
     const po = {
       id: `po_${Date.now()}`,
+      cycleId,
       catalogueId: mode === "adopt" ? catalogueId : null,
       code: useCode, title: useTitle,
       soId, kpaId: parentSO.kpaId, owner, weight: w,
@@ -781,8 +786,8 @@ function NewPOForm({ defaultSoId, onClose, onCreated }) {
 
   // Sort parent-SO options: uncovered SOs first (no POs yet), then alphabetical.
   const sortedSOs = [...sos].sort((a, b) => {
-    const aHas = state.performanceObjectives.some((p) => p.soId === a.id);
-    const bHas = state.performanceObjectives.some((p) => p.soId === b.id);
+    const aHas = cyclePOs.some((p) => p.soId === a.id);
+    const bHas = cyclePOs.some((p) => p.soId === b.id);
     if (aHas !== bHas) return aHas ? 1 : -1;
     return a.code.localeCompare(b.code);
   });
@@ -809,7 +814,7 @@ function NewPOForm({ defaultSoId, onClose, onCreated }) {
                 placeholder="Select a Strategic Objective…"
                 options={sortedSOs.map((o) => {
                   const k = kpaById(o.kpaId);
-                  const hasPO = state.performanceObjectives.some((p) => p.soId === o.id);
+                  const hasPO = cyclePOs.some((p) => p.soId === o.id);
                   const flag = hasPO ? "" : " · uncovered";
                   return { value: o.id, label: `${k.code} · ${o.code} · ${o.title}${flag}` };
                 })}/>
@@ -905,10 +910,11 @@ function NewPOForm({ defaultSoId, onClose, onCreated }) {
   );
 }
 
-function NewKPIForm({ defaultPoId, defaultSdoId, defaultIudfId, onClose, onCreated }) {
+function NewKPIForm({ defaultPoId, defaultSdoId, defaultIudfId, cycleId, onClose, onCreated }) {
   const { state, dispatch } = useContext(EPMSContext);
   const toast = useToast();
-  const pos = state.performanceObjectives;
+  const pos = state.performanceObjectives.filter((p) => p.cycleId === cycleId);
+  const cycleObjectives = state.objectives.filter((o) => o.cycleId === cycleId);
   const [poId, setPoId] = useState(defaultPoId || "");
   const [code, setCode] = useState("");
   const [title, setTitle] = useState("");
@@ -922,7 +928,7 @@ function NewKPIForm({ defaultPoId, defaultSdoId, defaultIudfId, onClose, onCreat
   const [owner, setOwner] = useState("");
 
   const parentPO = pos.find((p) => p.id === poId);
-  const parentSO = parentPO ? state.objectives.find((o) => o.id === parentPO.soId) : null;
+  const parentSO = parentPO ? cycleObjectives.find((o) => o.id === parentPO.soId) : null;
   const parentKpa = parentPO ? kpaById(parentPO.kpaId) : null;
 
   // Project-category-driven filtering of SDO / IUDF options.
@@ -965,6 +971,7 @@ function NewKPIForm({ defaultPoId, defaultSdoId, defaultIudfId, onClose, onCreat
     }
     const kpi = {
       id: `kpi_${Date.now()}`,
+      cycleId,
       code: code.trim(), title: title.trim(),
       kpaId: parentPO.kpaId, soId: parentPO.soId, poId,
       sdoId, iudfId, projectCategory,
@@ -980,8 +987,27 @@ function NewKPIForm({ defaultPoId, defaultSdoId, defaultIudfId, onClose, onCreat
     onClose();
   };
 
+  // If launched from an IDP Health "Resolve" action, surface the target
+  // outcome / IUDF name directly under the form title so the planner sees
+  // exactly which gap this KPI is meant to close.
+  const titleNode = (targetSdo || targetIudf) ? (
+    <span style={{ display: "flex", flexDirection: "column", lineHeight: 1.25, gap: 2 }}>
+      <span>Compose Master KPI</span>
+      {targetSdo && (
+        <span style={{ fontSize: 11, fontWeight: 600, color: C.warning, letterSpacing: "0.2px" }}>
+          Resolving · {targetSdo.code} — {targetSdo.label}
+        </span>
+      )}
+      {targetIudf && (
+        <span style={{ fontSize: 11, fontWeight: 600, color: C.warning, letterSpacing: "0.2px" }}>
+          Resolving · {targetIudf.code} — {targetIudf.label}
+        </span>
+      )}
+    </span>
+  ) : "Compose Master KPI";
+
   return (
-    <FormDrawer title="Compose Master KPI" onClose={onClose} width={560}
+    <FormDrawer title={titleNode} onClose={onClose} width={560}
                 footer={<>
                   <Btn variant="secondary" onClick={onClose}>Cancel</Btn>
                   <Btn onClick={submit}><I as={Add20Regular} size={14}/> Compose</Btn>
@@ -1007,7 +1033,7 @@ function NewKPIForm({ defaultPoId, defaultSdoId, defaultIudfId, onClose, onCreat
           </div>
         )}
 
-        <Select label="Parent Performance Objective" value={poId}
+        <Select label="Performance Objective" value={poId}
                 onChange={(e) => setPoId(e.target.value)}
                 placeholder="Select a Performance Objective…"
                 options={pos.map((p) => {
@@ -1106,7 +1132,13 @@ function SetupWizard({ onClose, onFinish }) {
       <FormDrawer title="IDP setup wizard" onClose={onClose} width={560}
                   footer={
                     <>
-                      <Btn variant="secondary" onClick={onClose}>Close</Btn>
+                      {step > 0 && (
+                        <Btn variant="secondary" onClick={() => setStep(step - 1)}>
+                          <I as={ArrowLeft20Regular} size={14}/> Back
+                        </Btn>
+                      )}
+                      {step === 0 && <Btn variant="secondary" onClick={onClose}>Close</Btn>}
+                      <div style={{ flex: 1 }}/>
                       {step < 3
                         ? <Btn disabled={
                             (step === 0 && !pickedKpa) ||
@@ -1503,11 +1535,17 @@ function Card({ children }) {
 }
 
 // ─── IDP View — main component ───────────────────────────────────────────────
-export function IDPView() {
+function IDPDetailView({ cycle, onBack }) {
   const { state } = useContext(EPMSContext);
   const toast = useToast();
   const [tab, setTab] = useState("kpa");
   const [selectedId, setSelectedId] = useState(null);
+
+  // Cycle-scoped data — only show items belonging to this IDP cycle.
+  const objectives = state.objectives.filter((o) => o.cycleId === cycle.id);
+  const performanceObjectives = state.performanceObjectives.filter((p) => p.cycleId === cycle.id);
+  const masterKpis = state.masterKpis.filter((k) => k.cycleId === cycle.id);
+  const readOnly = cycle.status === "Final";
 
   // Composer defaults — set by Resolve actions on the IDP Health tab so the
   // composers open already pointing at the gap that needs filling.
@@ -1519,24 +1557,22 @@ export function IDPView() {
   const [showNewPo, setShowNewPo] = useState(false);
   const [showNewKpi, setShowNewKpi] = useState(false);
   const [showCopy, setShowCopy] = useState(false);
-  // Auto-open the setup wizard the first time someone lands on the IDP view
-  // with no Master KPIs configured (Munsoft sequential setup mandate). Seeded
-  // at first render so it doesn't reopen if the user later deletes all KPIs.
-  const [showWizard, setShowWizard] = useState(() => state.masterKpis.length === 0);
+  // Auto-open the setup wizard the first time someone lands on a Draft IDP
+  // with no Master KPIs configured (Munsoft sequential setup mandate).
+  const [showWizard, setShowWizard] = useState(() => !readOnly && masterKpis.length === 0);
 
   const tabMeta = TABS.find((t) => t.id === tab);
-  const hasSOs = state.objectives.length > 0;
-  const hasPOs = state.performanceObjectives.length > 0;
+  const hasSOs = objectives.length > 0;
+  const hasPOs = performanceObjectives.length > 0;
 
   // IDP readiness — drives the meter, the Health tab, and the export gate.
   const checks = idpReadinessChecks({
-    objectives: state.objectives,
-    performanceObjectives: state.performanceObjectives,
-    masterKpis: state.masterKpis,
+    objectives,
+    masterKpis,
     kpas: KPAS,
     sdos: SERVICE_DELIVERY_OUTCOMES,
     iudfs: IUDF_OUTCOMES,
-    bands: IDP_CYCLE.kpaBands,
+    bands: cycle.kpaBands,
   });
   const summary = idpReadinessSummary(checks);
 
@@ -1575,9 +1611,9 @@ export function IDPView() {
       setTab("health");
       return;
     }
-    const body = ntExportString(state.masterKpis, phase, "2026/27");
+    const body = ntExportString(masterKpis, phase, "2026/27");
     downloadText(`${phase}_2026-27.txt`, body);
-    toast(`${phase} exported`, `${state.masterKpis.length} records`,
+    toast(`${phase} exported`, `${masterKpis.length} records`,
           { color: "#107c10", icon: <I as={CheckmarkCircle20Filled} size={16} color="#107c10"/> });
   };
 
@@ -1586,9 +1622,9 @@ export function IDPView() {
       case "kpa":  return KPAS;
       case "sdo":  return SERVICE_DELIVERY_OUTCOMES;
       case "iudf": return IUDF_OUTCOMES;
-      case "so":   return state.objectives;
-      case "po":   return state.performanceObjectives;
-      case "kpi":  return state.masterKpis;
+      case "so":   return objectives;
+      case "po":   return performanceObjectives;
+      case "kpi":  return masterKpis;
       default:     return [];
     }
   })();
@@ -1610,10 +1646,10 @@ export function IDPView() {
     { id: "code", label: "Code", get: (r) => r.code, width: 100,
       renderCell: (r) => <span style={{ fontWeight: 700, color: r.color }}>{r.code}</span> },
     { id: "label", label: "Key Performance Area", get: (r) => r.label, minWidth: 380 },
-    { id: "linked", label: "Strategic Objectives", get: (r) => state.objectives.filter((o) => o.kpaId === r.id).length,
+    { id: "linked", label: "Strategic Objectives", get: (r) => objectives.filter((o) => o.kpaId === r.id).length,
       width: 180, align: "right",
       renderCell: (r) => {
-        const n = state.objectives.filter((o) => o.kpaId === r.id).length;
+        const n = objectives.filter((o) => o.kpaId === r.id).length;
         return <span style={{ fontWeight: 700, color: n ? C.ink : C.faint }}>{n}</span>;
       } },
   ];
@@ -1623,10 +1659,10 @@ export function IDPView() {
     { id: "code", label: "Code", get: (r) => r.code, width: 110,
       renderCell: (r) => <span style={{ fontWeight: 700, color: C.brand }}>{r.code}</span> },
     { id: "label", label: "Service Delivery Outcome", get: (r) => r.label, minWidth: 460 },
-    { id: "kpi",  label: "KPIs", get: (r) => state.masterKpis.filter((k) => k.sdoId === r.id).length,
+    { id: "kpi",  label: "KPIs", get: (r) => masterKpis.filter((k) => k.sdoId === r.id).length,
       width: 100, align: "right",
       renderCell: (r) => {
-        const n = state.masterKpis.filter((k) => k.sdoId === r.id).length;
+        const n = masterKpis.filter((k) => k.sdoId === r.id).length;
         return <span style={{ fontWeight: 700, color: n ? C.ink : C.faint }}>{n}</span>;
       } },
   ];
@@ -1636,10 +1672,10 @@ export function IDPView() {
     { id: "code", label: "Code", get: (r) => r.code, width: 110,
       renderCell: (r) => <span style={{ fontWeight: 700, color: C.brandDark || C.brand }}>{r.code}</span> },
     { id: "label", label: "IUDF priority", get: (r) => r.label, minWidth: 380 },
-    { id: "kpi",  label: "KPIs", get: (r) => state.masterKpis.filter((k) => k.iudfId === r.id).length,
+    { id: "kpi",  label: "KPIs", get: (r) => masterKpis.filter((k) => k.iudfId === r.id).length,
       width: 100, align: "right",
       renderCell: (r) => {
-        const n = state.masterKpis.filter((k) => k.iudfId === r.id).length;
+        const n = masterKpis.filter((k) => k.iudfId === r.id).length;
         return <span style={{ fontWeight: 700, color: n ? C.ink : C.faint }}>{n}</span>;
       } },
   ];
@@ -1663,9 +1699,9 @@ export function IDPView() {
         const k = kpaById(o.kpaId);
         return <span style={{ fontWeight: 700, color: k.color }}>{o.weight || 0}%</span>;
       } },
-    { id: "po", label: "POs", get: (o) => state.performanceObjectives.filter((p) => p.soId === o.id).length,
+    { id: "po", label: "POs", get: (o) => performanceObjectives.filter((p) => p.soId === o.id).length,
       width: 70, align: "right" },
-    { id: "kpi", label: "KPIs", get: (o) => state.masterKpis.filter((k) => k.soId === o.id).length,
+    { id: "kpi", label: "KPIs", get: (o) => masterKpis.filter((k) => k.soId === o.id).length,
       width: 80, align: "right" },
     { id: "owner", label: "Owner", get: (o) => userById(o.owner).name, filterable: true, width: 180,
       renderCell: (o) => {
@@ -1686,13 +1722,13 @@ export function IDPView() {
     { id: "code", label: "Code", get: (p) => p.code, width: 110 },
     { id: "title", label: "Performance Objective", get: (p) => p.title, minWidth: 360 },
     { id: "so", label: "Parent SO", get: (p) => {
-        const so = state.objectives.find((o) => o.id === p.soId);
+        const so = objectives.find((o) => o.id === p.soId);
         return so ? so.code : "—";
       }, filterable: true, width: 100 },
     { id: "kpa", label: "KPA", get: (p) => kpaById(p.kpaId).code, filterable: true, width: 90 },
     { id: "weight", label: "Weight", get: (p) => p.weight || 0, width: 90, align: "right",
       renderCell: (p) => <span style={{ fontWeight: 700 }}>{p.weight || 0}%</span> },
-    { id: "kpi", label: "KPIs", get: (p) => state.masterKpis.filter((k) => k.poId === p.id).length,
+    { id: "kpi", label: "KPIs", get: (p) => masterKpis.filter((k) => k.poId === p.id).length,
       width: 80, align: "right" },
     { id: "owner", label: "Owner", get: (p) => userById(p.owner).name, filterable: true, width: 180,
       renderCell: (p) => {
@@ -1711,9 +1747,9 @@ export function IDPView() {
       renderCell: (k) => <span style={{ fontWeight: 700, color: C.brand }}>{k.code}</span> },
     { id: "title", label: "Indicator", get: (k) => k.title, minWidth: 320 },
     { id: "kpa",  label: "KPA",  get: (k) => kpaById(k.kpaId).code, filterable: true, width: 80 },
-    { id: "so",   label: "SO",   get: (k) => state.objectives.find((o) => o.id === k.soId)?.code || "—",
+    { id: "so",   label: "SO",   get: (k) => objectives.find((o) => o.id === k.soId)?.code || "—",
       filterable: true, width: 90 },
-    { id: "po",   label: "PO",   get: (k) => state.performanceObjectives.find((p) => p.id === k.poId)?.code || "—",
+    { id: "po",   label: "PO",   get: (k) => performanceObjectives.find((p) => p.id === k.poId)?.code || "—",
       filterable: true, width: 100 },
     { id: "sdo",  label: "SDO",  get: (k) => sdoById(k.sdoId)?.code || "—", filterable: true, width: 110 },
     { id: "iudf", label: "IUDF", get: (k) => iudfById(k.iudfId)?.code || "—", filterable: true, width: 90 },
@@ -1787,7 +1823,7 @@ export function IDPView() {
       ],
       [
         { icon: CopyArrowRight20Regular, label: "Roll forward to next FY",
-          disabled: state.masterKpis.length === 0,
+          disabled: masterKpis.length === 0,
           onClick: () => setShowCopy(true) },
         { icon: Sparkle20Regular, label: "Run setup wizard",
           onClick: () => setShowWizard(true) },
@@ -1818,10 +1854,20 @@ export function IDPView() {
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
       <ViewHeader
-        title="IDP & Performance Framework"
+        title={
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
+            <button onClick={onBack} style={{
+              background: "transparent", border: "none", cursor: "pointer",
+              color: C.muted, display: "inline-flex", alignItems: "center", padding: "2px 4px",
+            }}><I as={ArrowLeft20Regular} size={18}/></button>
+            <span>{cycle.label}</span>
+            {readOnly && <Pill bg={C.successBg} fg={C.success}>Final</Pill>}
+            {!readOnly && <Pill bg={C.warningBg} fg={C.warning}>Draft</Pill>}
+          </span>
+        }
         subtitle={
           <span style={{ display: "inline-flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            <span>{IDP_CYCLE.label} · {IDP_CYCLE.reviewYear}</span>
+            <span>{cycle.term} · {cycle.reviewYear}</span>
             <span style={{ opacity: 0.4 }}>·</span>
             <ReadinessMeter summary={summary} size="sm"/>
             {summary.pct < 100 && tab !== "health" && (
@@ -1834,7 +1880,7 @@ export function IDPView() {
             )}
           </span>
         }
-        action={tab === "kpi" && state.masterKpis.length === 0
+        action={tab === "kpi" && masterKpis.length === 0 && !readOnly
           ? <Btn onClick={() => setShowWizard(true)}><I as={Sparkle20Regular} size={14}/> Run setup wizard</Btn>
           : null}
         commandBar={<CommandBar groups={commandGroups}/>}
@@ -1842,7 +1888,7 @@ export function IDPView() {
       <TabStrip active={tab} onSelect={(id) => { setTab(id); setSelectedId(null); }}/>
 
       {(tab === "kpa" || tab === "so") && (
-        <KPABalanceBar objectives={state.objectives} bands={IDP_CYCLE.kpaBands}/>
+        <KPABalanceBar objectives={objectives} bands={cycle.kpaBands}/>
       )}
 
       {tab === "po" && !hasSOs && (
@@ -1879,22 +1925,34 @@ export function IDPView() {
         />
       )}
 
-      {selected && (
-        <Drawer onClose={() => setSelectedId(null)} width={640}>
-          {drawerFor(selected)}
-        </Drawer>
-      )}
+      {selected && (() => {
+        const idx = rows.findIndex((r) => r.id === selectedId);
+        return (
+          <Drawer onClose={() => setSelectedId(null)} width={640}
+                  onPrev={idx > 0 ? () => setSelectedId(rows[idx - 1].id) : null}
+                  onNext={idx < rows.length - 1 ? () => setSelectedId(rows[idx + 1].id) : null}>
+            {drawerFor(selected)}
+          </Drawer>
+        );
+      })()}
 
       {showNewSo  && (
         <NewSOForm
           defaultKpaId={newSoDefaultKpa}
+          cycleId={cycle.id}
+          cycleBands={cycle.kpaBands}
           onClose={() => { setShowNewSo(false); setNewSoDefaultKpa(""); }}/>
       )}
-      {showNewPo  && <NewPOForm  onClose={() => setShowNewPo(false)}/>}
+      {showNewPo  && (
+        <NewPOForm
+          cycleId={cycle.id}
+          onClose={() => setShowNewPo(false)}/>
+      )}
       {showNewKpi && (
         <NewKPIForm
           defaultSdoId={newKpiDefaultSdo}
           defaultIudfId={newKpiDefaultIudf}
+          cycleId={cycle.id}
           onClose={() => {
             setShowNewKpi(false);
             setNewKpiDefaultSdo("");
@@ -1909,6 +1967,218 @@ export function IDPView() {
                                               { color: "#107c10",
                                                 icon: <I as={CheckmarkCircle20Filled} size={16} color="#107c10"/> }); }}/>
       )}
+    </div>
+  );
+}
+
+// ─── Create IDP form ─────────────────────────────────────────────────────────
+function CreateIDPForm({ onClose, onCreated }) {
+  const { state, dispatch } = useContext(EPMSContext);
+  const toast = useToast();
+  const currentYear = new Date().getFullYear();
+  const yearOptions = Array.from({ length: 8 }, (_, i) => {
+    const y = currentYear + i;
+    return { value: String(y), label: `${y}/${String(y + 1).slice(2)}` };
+  });
+  const [startYear, setStartYear] = useState(String(currentYear + 1));
+  const endYear = Number(startYear) + 4;
+  const label = `IDP ${startYear}–${endYear + 1}`;
+  const term = `${startYear}/${String(Number(startYear) + 1).slice(2)} – ${endYear}/${String(endYear + 1).slice(2)}`;
+
+  const exists = state.idpCycles.some((c) => c.label === label);
+
+  const submit = () => {
+    if (exists) {
+      toast("Cycle already exists", `${label} is already in the list`,
+            { color: "#7a5700" });
+      return;
+    }
+    const cycle = {
+      id: `idp_${startYear}_${String(endYear + 1).slice(2)}`,
+      label, term,
+      reviewYear: "—",
+      mecRating: "—",
+      mecComments: "",
+      tabledOnCouncil: null,
+      status: "Draft",
+      kpaBands: {
+        kpa1: { min: 25, max: 45 },
+        kpa2: { min: 5, max: 20 },
+        kpa3: { min: 10, max: 25 },
+        kpa4: { min: 5, max: 20 },
+        kpa5: { min: 5, max: 15 },
+      },
+    };
+    dispatch({ type: "CREATE_IDP_CYCLE", cycle });
+    toast("IDP created", `${label} · Draft — pre-loaded with Treasury KPAs, SDOs, and IUDF`,
+          { icon: <I as={CheckmarkCircle20Filled} size={16} color="#107c10"/>, color: "#107c10" });
+    onCreated(cycle.id);
+    onClose();
+  };
+
+  return (
+    <FormDrawer title="Create IDP" onClose={onClose} width={520}
+                footer={<>
+                  <Btn variant="secondary" onClick={onClose}>Cancel</Btn>
+                  <Btn disabled={exists} onClick={submit}>
+                    <I as={Add20Regular} size={14}/> Create
+                  </Btn>
+                </>}>
+      <div style={{ padding: 20 }}>
+        <FormIntro>
+          A new IDP starts in <strong>Draft</strong> status, pre-loaded with the 5 Treasury
+          KPAs, 14 Service Delivery Outcomes, and 4 IUDF priorities. Your job is to adopt
+          Strategic Objectives and Performance Objectives from the catalogue, then compose
+          Master KPIs linking everything together. Once complete, present it to Council for
+          approval.
+        </FormIntro>
+        <Select label="Term start year" value={startYear}
+                onChange={(e) => setStartYear(e.target.value)}
+                options={yearOptions}/>
+        <div style={{
+          background: C.surfaceMute, borderRadius: 4, padding: "12px 14px",
+          marginBottom: 14,
+        }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: C.muted,
+                        textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 4 }}>
+            Will create
+          </div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: C.ink }}>{label}</div>
+          <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>5-year term: {term}</div>
+          {exists && (
+            <div style={{ fontSize: 12, color: C.danger, fontWeight: 600, marginTop: 6 }}>
+              This cycle already exists.
+            </div>
+          )}
+        </div>
+        <div style={{ fontSize: 11, fontWeight: 700, color: C.muted,
+                      textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 8 }}>
+          Pre-loaded Treasury parameters
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: 14 }}>
+          <MiniStat label="KPAs" value={KPAS.length}/>
+          <MiniStat label="SDOs" value={SERVICE_DELIVERY_OUTCOMES.length}/>
+          <MiniStat label="IUDF" value={IUDF_OUTCOMES.length}/>
+        </div>
+        <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5 }}>
+          KPA balance bands default to the National Treasury standard for Category B municipalities.
+          You can adjust them from within the IDP after creation.
+        </div>
+      </div>
+    </FormDrawer>
+  );
+}
+
+// ─── IDP list — the landing page ─────────────────────────────────────────────
+export function IDPView() {
+  const { state, dispatch } = useContext(EPMSContext);
+  const toast = useToast();
+  const [activeCycleId, setActiveCycleId] = useState(null);
+  const [showCreate, setShowCreate] = useState(false);
+
+  const activeCycle = activeCycleId
+    ? state.idpCycles.find((c) => c.id === activeCycleId)
+    : null;
+
+  if (activeCycle) {
+    return <IDPDetailView cycle={activeCycle} onBack={() => setActiveCycleId(null)}/>;
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
+      <ViewHeader
+        title="Integrated Development Plans"
+        subtitle={`${state.idpCycles.length} cycles · select a plan to view or edit`}
+        action={<Btn onClick={() => setShowCreate(true)}><I as={Add20Regular} size={14}/> Create IDP</Btn>}
+      />
+      <div style={{ flex: 1, overflow: "auto", padding: "18px 22px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 14 }}>
+          {state.idpCycles.map((c) => {
+            const scopedSOs  = state.objectives.filter((o) => o.cycleId === c.id);
+            const scopedKPIs = state.masterKpis.filter((k) => k.cycleId === c.id);
+            const checks = idpReadinessChecks({
+              objectives: scopedSOs, masterKpis: scopedKPIs,
+              kpas: KPAS, sdos: SERVICE_DELIVERY_OUTCOMES, iudfs: IUDF_OUTCOMES,
+              bands: c.kpaBands,
+            });
+            const summary = idpReadinessSummary(checks);
+            const isDraft = c.status === "Draft";
+            const statusFg = isDraft ? C.warning : C.success;
+            const statusBg = isDraft ? C.warningBg : C.successBg;
+            return (
+              <div key={c.id}
+                   onClick={() => setActiveCycleId(c.id)}
+                   style={{
+                     background: "#fff", border: `1px solid ${C.hairline}`,
+                     borderRadius: 4, padding: "18px 20px",
+                     cursor: "pointer", transition: "box-shadow 0.15s",
+                     display: "flex", flexDirection: "column", gap: 12,
+                   }}
+                   onMouseEnter={(e) => e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.1)"}
+                   onMouseLeave={(e) => e.currentTarget.style.boxShadow = "none"}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <div>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: C.ink }}>{c.label}</div>
+                    <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>{c.term}</div>
+                  </div>
+                  <Pill bg={statusBg} fg={statusFg}>{c.status}</Pill>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
+                  <MiniStat label="SOs" value={scopedSOs.length}/>
+                  <MiniStat label="KPIs" value={scopedKPIs.length}/>
+                  <MiniStat label="Readiness" value={`${summary.pct}%`}
+                            color={summary.pct === 100 ? C.success : summary.pct >= 50 ? C.brand : C.warning}/>
+                </div>
+
+                <div style={{ height: 6, background: C.surfaceMute, borderRadius: 100, overflow: "hidden" }}>
+                  <div style={{
+                    height: "100%", width: `${summary.pct}%`,
+                    background: summary.pct === 100 ? C.success : summary.pct >= 50 ? C.brand : C.warning,
+                    borderRadius: 100, transition: "width 0.3s",
+                  }}/>
+                </div>
+
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
+                              fontSize: 11, color: C.muted }}>
+                  <span>MEC: {c.mecRating}</span>
+                  <span>{c.reviewYear}</span>
+                </div>
+
+                {isDraft && (
+                  <Btn variant="success" size="sm"
+                       disabled={summary.pct < 100}
+                       onClick={(e) => {
+                         e.stopPropagation();
+                         if (summary.pct < 100) return;
+                         dispatch({ type: "APPROVE_IDP_CYCLE", cycleId: c.id });
+                         toast("IDP approved by council", `${c.label} → Final`,
+                               { icon: <I as={CheckmarkCircle20Filled} size={16} color="#107c10"/>,
+                                 color: "#107c10" });
+                       }}>
+                    <I as={CheckmarkCircle20Filled} size={13}/> Present to Council
+                  </Btn>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      {showCreate && (
+        <CreateIDPForm
+          onClose={() => setShowCreate(false)}
+          onCreated={(id) => setActiveCycleId(id)}/>
+      )}
+    </div>
+  );
+}
+
+function MiniStat({ label, value, color = C.ink }) {
+  return (
+    <div style={{ textAlign: "center" }}>
+      <div style={{ fontSize: 10, fontWeight: 600, color: C.muted, textTransform: "uppercase",
+                    letterSpacing: "0.4px" }}>{label}</div>
+      <div style={{ fontSize: 18, fontWeight: 700, color, marginTop: 2 }}>{value}</div>
     </div>
   );
 }

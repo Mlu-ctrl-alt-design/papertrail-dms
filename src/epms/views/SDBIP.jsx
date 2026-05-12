@@ -9,12 +9,12 @@ import {
   CheckmarkCircle20Filled,
 } from "@fluentui/react-icons";
 import {
-  I, C, Btn, Pill, Drawer, DataTable,
-  ViewHeader, CommandBar, useToast,
+  I, C, Btn, Pill, Drawer, FormDrawer, DataTable,
+  ViewHeader, CommandBar, Input, Select, useToast,
 } from "../../components/index.js";
 import { EPMSContext } from "../state.js";
 import { Avatar } from "../Avatar.jsx";
-import { DEPARTMENTS, WARDS, userById } from "../data.js";
+import { DEPARTMENTS, KPAS, WARDS, userById } from "../data.js";
 import { statusColor, formatZAR, formatZARFull, fmtDate } from "../helpers.js";
 import { CascadeView, debtorCascade } from "./Cascade.jsx";
 import { takeIntent } from "../intents.js";
@@ -234,6 +234,245 @@ function MSCOATxDrawer({ tx, onClose }) {
   );
 }
 
+function kpaById(id) { return KPAS.find((k) => k.id === id); }
+
+function AddToSDBIPForm({ onClose }) {
+  const { state, dispatch } = useContext(EPMSContext);
+  const toast = useToast();
+  const [kpiId, setKpiId] = useState("");
+  const [q1, setQ1] = useState("");
+  const [q2, setQ2] = useState("");
+  const [q3, setQ3] = useState("");
+  const [q4, setQ4] = useState("");
+  const [mscoaProject, setMscoaProject] = useState("");
+  const [newSegmentMode, setNewSegmentMode] = useState(false);
+  const [department, setDepartment] = useState("");
+  const [owner, setOwner] = useState("");
+
+  // Collect all known mSCOA project-segment codes from existing data.
+  const knownSegments = [...new Set([
+    ...state.mscoaTx.map((t) => t.project).filter(Boolean),
+    ...state.sdbipTargets.map((t) => t.mscoaProject).filter((v) => v && v !== "—"),
+    ...state.capitalProjects.map((p) => p.id),
+  ])].sort();
+
+  const alreadyInSdbip = new Set(state.sdbipTargets.map((t) => t.kpiId).filter(Boolean));
+  const currentFy = "2026/27";
+  const available = state.masterKpis
+    .filter((k) => k.fy === currentFy)
+    .map((k) => ({ ...k, adopted: alreadyInSdbip.has(k.id) }))
+    .sort((a, b) => {
+      if (a.adopted !== b.adopted) return a.adopted ? 1 : -1;
+      return a.code.localeCompare(b.code);
+    });
+
+  const picked = kpiId ? state.masterKpis.find((k) => k.id === kpiId) : null;
+
+  const selectKpi = (id) => {
+    setKpiId(id);
+    const kpi = state.masterKpis.find((k) => k.id === id);
+    if (kpi) {
+      if (!owner) setOwner(kpi.owner || "");
+      if (!department) {
+        const u = userById(kpi.owner);
+        if (u.department) setDepartment(u.department);
+      }
+    }
+  };
+
+  const n = (v) => parseInt(v, 10) || 0;
+  const annual = n(q1) + n(q2) + n(q3) + n(q4);
+
+  const submit = () => {
+    if (!kpiId || !picked) {
+      toast("Select a KPI", "Pick a Master KPI from the IDP to add to this SDBIP.",
+            { color: "#7a5700" });
+      return;
+    }
+    if (!department || !owner) {
+      toast("Missing details", "Department and owner are required.",
+            { color: "#7a5700" });
+      return;
+    }
+    if (annual <= 0) {
+      toast("Set quarterly targets", "At least one quarter must have a target > 0.",
+            { color: "#7a5700" });
+      return;
+    }
+    const target = {
+      id: `sd_${Date.now()}`,
+      code: `SD-T-${String(state.sdbipTargets.length + 1).padStart(3, "0")}`,
+      kpiId,
+      soId: picked.soId,
+      department,
+      indicator: picked.title,
+      unit: picked.unit || "",
+      q1: n(q1), q2: n(q2), q3: n(q3), q4: n(q4),
+      ytd: 0,
+      annual,
+      mscoaProject: mscoaProject.trim() || "—",
+      wards: [],
+      owner,
+      status: "On track",
+    };
+    dispatch({ type: "ADD_SDBIP_TARGET", target });
+    toast("KPI added to SDBIP", `${picked.code} → ${target.code}`,
+          { icon: <I as={CheckmarkCircle20Filled} size={16} color="#107c10"/>, color: "#107c10" });
+    onClose();
+  };
+
+  return (
+    <FormDrawer title="Add IDP KPI to SDBIP" onClose={onClose} width={560}
+                footer={<>
+                  <Btn variant="secondary" onClick={onClose}>Cancel</Btn>
+                  <Btn onClick={submit}><I as={Add20Regular} size={14}/> Add to SDBIP</Btn>
+                </>}>
+      <div style={{ padding: 20 }}>
+        <div style={{
+          background: C.brandTint, border: `1px solid ${C.brand}40`,
+          borderRadius: 4, padding: "10px 12px", marginBottom: 14,
+          fontSize: 12, color: C.ink, lineHeight: 1.5,
+        }}>
+          The SDBIP is a fiscal-year selection of IDP Master KPIs. Pick a KPI
+          below, then set quarterly targets and the mSCOA project binding.
+        </div>
+
+        <div style={{ fontSize: 11, fontWeight: 700, color: C.muted,
+                      textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 6 }}>
+          Select IDP Master KPI ({currentFy})
+        </div>
+        <div style={{
+          border: `1px solid ${C.hairline}`, borderRadius: 4,
+          maxHeight: 260, overflow: "auto", background: "#fff", marginBottom: 14,
+        }}>
+          {available.length === 0 && (
+            <div style={{ padding: "14px", fontSize: 12, color: C.faint }}>
+              No Master KPIs in {currentFy}. Compose KPIs in the IDP module first.
+            </div>
+          )}
+          {available.map((k) => {
+            const kpa = kpaById(k.kpaId);
+            const selected = k.id === kpiId;
+            return (
+              <button key={k.id}
+                      disabled={k.adopted}
+                      onClick={() => selectKpi(k.id)} style={{
+                width: "100%", textAlign: "left", border: "none",
+                background: selected ? `${kpa.color}12` : "transparent",
+                borderBottom: `1px solid ${C.hairline}`,
+                padding: "9px 12px",
+                cursor: k.adopted ? "not-allowed" : "pointer",
+                opacity: k.adopted ? 0.5 : 1,
+                fontFamily: "inherit",
+                display: "flex", alignItems: "flex-start", gap: 10,
+              }}>
+                <div style={{
+                  width: 26, height: 26, borderRadius: 4, background: kpa.color,
+                  color: "#fff", display: "grid", placeItems: "center",
+                  fontWeight: 700, fontSize: 10, flexShrink: 0, marginTop: 2,
+                }}>{kpa.code.replace("KPA ", "")}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 10, color: kpa.color, fontWeight: 700,
+                                letterSpacing: "0.4px" }}>{k.code}</div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: C.ink, lineHeight: 1.3 }}>
+                    {k.title}
+                  </div>
+                  <div style={{ fontSize: 10, color: C.muted, marginTop: 2 }}>
+                    Target: {k.target} {k.unit} · {k.fy}
+                  </div>
+                </div>
+                {k.adopted && (
+                  <Pill bg={C.surfaceMute} fg={C.muted}>In SDBIP</Pill>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {picked && (
+          <div style={{
+            background: C.surfaceMute, borderRadius: 4, padding: "8px 12px",
+            marginBottom: 14, fontSize: 11, color: C.muted, lineHeight: 1.5,
+          }}>
+            <strong style={{ color: C.ink }}>{picked.code}</strong> — {picked.title}
+            <span style={{ margin: "0 6px" }}>·</span>
+            IDP target: <strong style={{ color: C.ink }}>{picked.target} {picked.unit}</strong>
+          </div>
+        )}
+
+        <div style={{ fontSize: 11, fontWeight: 700, color: C.muted,
+                      textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 8 }}>
+          Quarterly targets
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 14 }}>
+          <Input label="Q1" type="number" value={q1} onChange={(e) => setQ1(e.target.value)} placeholder="0"/>
+          <Input label="Q2" type="number" value={q2} onChange={(e) => setQ2(e.target.value)} placeholder="0"/>
+          <Input label="Q3" type="number" value={q3} onChange={(e) => setQ3(e.target.value)} placeholder="0"/>
+          <Input label="Q4" type="number" value={q4} onChange={(e) => setQ4(e.target.value)} placeholder="0"/>
+        </div>
+        {annual > 0 && (
+          <div style={{ fontSize: 12, color: C.ink, marginBottom: 14 }}>
+            Annual total: <strong>{annual.toLocaleString()}</strong>
+            {picked && ` ${picked.unit || ""}`}
+            {picked && picked.target != null && (
+              <span style={{ color: annual >= picked.target ? C.success : C.warning, marginLeft: 8 }}>
+                ({annual >= picked.target ? "meets" : "below"} IDP target of {picked.target})
+              </span>
+            )}
+          </div>
+        )}
+
+        <div style={{ marginBottom: 12 }}>
+          <div style={{
+            display: "flex", justifyContent: "space-between", alignItems: "baseline",
+            marginBottom: 4,
+          }}>
+            <div style={{
+              fontSize: 11, fontWeight: 600, color: C.muted,
+              textTransform: "uppercase", letterSpacing: "0.5px",
+            }}>mSCOA segment</div>
+            <button onClick={() => { setNewSegmentMode(!newSegmentMode); setMscoaProject(""); }}
+                    style={{
+                      background: "none", border: "none", cursor: "pointer",
+                      fontSize: 11, fontWeight: 600, color: C.brand,
+                      fontFamily: "inherit", padding: 0,
+                    }}>
+              {newSegmentMode ? "Pick existing" : "+ Create new"}
+            </button>
+          </div>
+          {newSegmentMode ? (
+            <input value={mscoaProject} onChange={(e) => setMscoaProject(e.target.value)}
+                   placeholder="e.g. EL-CAP-2026-003"
+                   style={{
+                     width: "100%", padding: "8px 10px",
+                     border: `1px solid ${C.hairlineSoft}`, borderRadius: 4,
+                     fontSize: 13, background: C.surfaceAlt, color: C.text,
+                     fontFamily: "ui-monospace, monospace",
+                   }}/>
+          ) : (
+            <Select value={mscoaProject}
+                    onChange={(e) => setMscoaProject(e.target.value)}
+                    placeholder="Select an existing segment…"
+                    options={knownSegments.map((s) => ({ value: s, label: s }))}
+                    style={{ marginBottom: 0 }}/>
+          )}
+        </div>
+        <Select label="Department" value={department}
+                onChange={(e) => setDepartment(e.target.value)}
+                placeholder="Select a department…"
+                options={DEPARTMENTS.map((d) => ({ value: d.id, label: d.label }))}/>
+        <Select label="Owner" value={owner}
+                onChange={(e) => setOwner(e.target.value)}
+                placeholder="Select an accountable owner…"
+                options={["u_mm","u_cfo","u_corp","u_tech","u_comm"].map((id) => {
+                  const u = userById(id);
+                  return { value: id, label: `${u.name} — ${u.role}` };
+                })}/>
+      </div>
+    </FormDrawer>
+  );
+}
+
 export function SDBIPView() {
   const { state } = useContext(EPMSContext);
   const toast = useToast();
@@ -241,6 +480,7 @@ export function SDBIPView() {
   const [selSdbipId, setSelSdbipId] = useState(null);
   const [cascadeId, setCascadeId] = useState(null);
   const [selTxId, setSelTxId] = useState(null);
+  const [showAddKpi, setShowAddKpi] = useState(false);
 
   // If the dashboard's Targets Requiring Attention list set a pending cascade
   // intent, consume it on mount and open the cascade drawer automatically.
@@ -264,6 +504,12 @@ export function SDBIPView() {
   // ── SDBIP cascade ─────────────────────────────────────────────────────────
   const sdbipCols = [
     { id: "code", label: "Ref", get: (t) => t.code, width: 100 },
+    { id: "kpi", label: "IDP KPI", get: (t) => t.kpiId || "—", width: 120,
+      renderCell: (t) => {
+        if (!t.kpiId) return <Pill bg={C.warningBg} fg={C.warning}>Unlinked</Pill>;
+        const kpi = state.masterKpis.find((k) => k.id === t.kpiId);
+        return <span style={{ fontFamily: "ui-monospace, monospace", fontSize: 11, color: C.brand }}>{kpi?.code || t.kpiId}</span>;
+      } },
     { id: "indicator", label: "Indicator", get: (t) => t.indicator, minWidth: 280,
       renderCell: (t) => {
         const so = state.objectives.find((o) => o.id === t.soId);
@@ -315,7 +561,8 @@ export function SDBIPView() {
     { id: "description", label: "Description", get: (t) => t.description, minWidth: 250,
       renderCell: (t) => <span style={{ fontWeight: 600, color: C.ink }}>{t.description}</span> },
     { id: "function", label: "Function", get: (t) => t.function, filterable: true, width: 160 },
-    { id: "funding", label: "Funding", get: (t) => t.funding, filterable: true, width: 130 },
+    { id: "segment", label: "Segment", get: (t) => t.project, filterable: true, width: 170,
+      renderCell: (t) => <span style={{ fontFamily: "ui-monospace, monospace", fontSize: 11 }}>{t.project}</span> },
     { id: "amount", label: "Amount", get: (t) => t.amount, width: 130, align: "right",
       renderCell: (t) => (
         <span style={{ fontWeight: 700, color: t.amount > 0 ? C.success : C.danger, whiteSpace: "nowrap" }}>
@@ -380,8 +627,8 @@ export function SDBIPView() {
         }
         commandBar={<CommandBar groups={[
           [
-            { icon: Add20Regular, label: tab === "mscoa" ? "Capture journal" : "New target",
-              onClick: () => toast("New entry", "Form opened") },
+            { icon: Add20Regular, label: tab === "mscoa" ? "Capture journal" : "Add IDP KPI",
+              onClick: () => tab === "sdbip" ? setShowAddKpi(true) : toast("New entry", "Form opened") },
             { icon: CloudSync20Regular, label: "Sync from financial system",
               onClick: () => toast("Sync started", "Pulling from Sage / Munsoft via SFTP") },
           ],
@@ -446,6 +693,7 @@ export function SDBIPView() {
           <MSCOATxDrawer tx={selTx} onClose={() => setSelTxId(null)}/>
         </Drawer>
       )}
+      {showAddKpi && <AddToSDBIPForm onClose={() => setShowAddKpi(false)}/>}
     </div>
   );
 }
