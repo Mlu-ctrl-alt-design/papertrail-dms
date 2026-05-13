@@ -1535,11 +1535,52 @@ function Card({ children }) {
 }
 
 // ─── IDP View — main component ───────────────────────────────────────────────
+// ─── Step accordion shell ────────────────────────────────────────────────────
+function StepSection({ step, label, hint, complete, inProgress, expanded, onToggle, count, total, children }) {
+  const tone = complete ? C.success : inProgress ? C.brand : C.faint;
+  return (
+    <div style={{
+      border: `1px solid ${complete ? `${C.success}40` : C.hairline}`,
+      borderRadius: 4, marginBottom: 12, overflow: "hidden",
+      background: "#fff",
+    }}>
+      <button onClick={onToggle} style={{
+        width: "100%", textAlign: "left", border: "none", background: "transparent",
+        padding: "14px 18px", cursor: "pointer", fontFamily: "inherit",
+        display: "flex", alignItems: "center", gap: 12,
+      }}>
+        <div style={{
+          width: 28, height: 28, borderRadius: "50%",
+          background: complete ? C.success : inProgress ? C.brand : C.surfaceMute,
+          color: complete || inProgress ? "#fff" : C.muted,
+          display: "grid", placeItems: "center",
+          fontSize: 12, fontWeight: 700, flexShrink: 0,
+        }}>{complete ? <I as={CheckmarkCircle20Filled} size={15}/> : step}</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: C.ink }}>{label}</div>
+          {hint && <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>{hint}</div>}
+        </div>
+        {total != null && (
+          <span style={{ fontSize: 12, fontWeight: 700, color: tone }}>
+            {count} / {total}
+          </span>
+        )}
+        <I as={ArrowRight20Regular} size={16}
+           style={{ color: C.muted, transform: expanded ? "rotate(90deg)" : "none",
+                    transition: "transform 0.15s" }}/>
+      </button>
+      {expanded && (
+        <div style={{ padding: "0 18px 18px 18px", borderTop: `1px solid ${C.hairline}` }}>
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function IDPDetailView({ cycle, onBack }) {
   const { state } = useContext(EPMSContext);
   const toast = useToast();
-  const [tab, setTab] = useState("kpa");
-  const [selectedId, setSelectedId] = useState(null);
 
   // Cycle-scoped data — only show items belonging to this IDP cycle.
   const objectives = state.objectives.filter((o) => o.cycleId === cycle.id);
@@ -1547,8 +1588,7 @@ function IDPDetailView({ cycle, onBack }) {
   const masterKpis = state.masterKpis.filter((k) => k.cycleId === cycle.id);
   const readOnly = cycle.status === "Final";
 
-  // Composer defaults — set by Resolve actions on the IDP Health tab so the
-  // composers open already pointing at the gap that needs filling.
+  // Form state
   const [newSoDefaultKpa, setNewSoDefaultKpa] = useState("");
   const [newKpiDefaultSdo, setNewKpiDefaultSdo] = useState("");
   const [newKpiDefaultIudf, setNewKpiDefaultIudf] = useState("");
@@ -1557,58 +1597,53 @@ function IDPDetailView({ cycle, onBack }) {
   const [showNewPo, setShowNewPo] = useState(false);
   const [showNewKpi, setShowNewKpi] = useState(false);
   const [showCopy, setShowCopy] = useState(false);
-  // Auto-open the setup wizard the first time someone lands on a Draft IDP
-  // with no Master KPIs configured (Munsoft sequential setup mandate).
   const [showWizard, setShowWizard] = useState(() => !readOnly && masterKpis.length === 0);
 
-  const tabMeta = TABS.find((t) => t.id === tab);
-  const hasSOs = objectives.length > 0;
-  const hasPOs = performanceObjectives.length > 0;
+  // Drawer state for previewing entities.
+  const [drawerType, setDrawerType] = useState(null);
+  const [drawerId, setDrawerId] = useState(null);
+  const openDrawer = (type, id) => { setDrawerType(type); setDrawerId(id); };
+  const closeDrawer = () => { setDrawerType(null); setDrawerId(null); };
+  const drawerEntity = drawerId && (
+    drawerType === "so"  ? objectives.find((o) => o.id === drawerId) :
+    drawerType === "po"  ? performanceObjectives.find((p) => p.id === drawerId) :
+    drawerType === "kpi" ? masterKpis.find((k) => k.id === drawerId) : null
+  );
+  const drawerList = drawerType === "so" ? objectives
+                   : drawerType === "po" ? performanceObjectives
+                   : drawerType === "kpi" ? masterKpis : [];
+  const drawerIdx = drawerEntity ? drawerList.findIndex((r) => r.id === drawerId) : -1;
 
-  // IDP readiness — drives the meter, the Health tab, and the export gate.
+  // IDP readiness.
   const checks = idpReadinessChecks({
-    objectives,
-    masterKpis,
-    kpas: KPAS,
-    sdos: SERVICE_DELIVERY_OUTCOMES,
-    iudfs: IUDF_OUTCOMES,
+    objectives, masterKpis,
+    kpas: KPAS, sdos: SERVICE_DELIVERY_OUTCOMES, iudfs: IUDF_OUTCOMES,
     bands: cycle.kpaBands,
   });
   const summary = idpReadinessSummary(checks);
 
-  const openSoComposer = (kpaId = "") => {
-    setNewSoDefaultKpa(kpaId);
-    setShowNewSo(true);
-  };
-  const openKpiComposer = ({ sdoId = "", iudfId = "" } = {}) => {
-    if (!hasPOs) {
-      setTab("po");
-      toast("Create a Performance Objective first", "Master KPIs must sit under a PO.",
-            { color: "#7a5700" });
-      return;
-    }
-    setNewKpiDefaultSdo(sdoId);
-    setNewKpiDefaultIudf(iudfId);
-    setShowNewKpi(true);
-  };
+  // Step completion.
+  const kpaCovered = KPAS.every((k) => objectives.some((o) => o.kpaId === k.id));
+  const allSOsHavePO = objectives.length > 0 && objectives.every((o) =>
+    performanceObjectives.some((p) => p.soId === o.id));
+  const allKPAsHaveKPI = KPAS.every((k) => masterKpis.some((m) => m.kpaId === k.id));
+  const sdoCovCount = SERVICE_DELIVERY_OUTCOMES.filter((s) => masterKpis.some((m) => m.sdoId === s.id)).length;
+  const iudfCovCount = IUDF_OUTCOMES.filter((u) => masterKpis.some((m) => m.iudfId === u.id)).length;
+  const kpiStepDone = allKPAsHaveKPI && sdoCovCount === 14 && iudfCovCount === 4;
+  const balanceOk = KPAS.every((k) => kpaBandStatus(k.id, objectives, cycle.kpaBands).state === "ok");
+  const step1Done = kpaCovered;
+  const step2Done = step1Done && allSOsHavePO;
+  const step3Done = step2Done && kpiStepDone;
+  const step4Done = step3Done && balanceOk;
 
-  const resolveCheck = (check) => {
-    const { kind, filters } = check.resolve || {};
-    if (kind === "so-picker") {
-      openSoComposer(filters?.kpaId || "");
-    } else if (kind === "kpi-composer") {
-      openKpiComposer({ sdoId: filters?.sdoId, iudfId: filters?.iudfId });
-    }
-  };
+  const firstIncomplete = !step1Done ? 1 : !step2Done ? 2 : !step3Done ? 3 : !step4Done ? 4 : 0;
+  const [expanded, setExpanded] = useState(firstIncomplete || 1);
+  const toggle = (n) => setExpanded(expanded === n ? 0 : n);
 
-  // Export gate — refuse to download when readiness < 100%.
   const guardedExport = (phase) => () => {
     if (summary.pct < 100) {
-      const firstGap = checks.find((c) => c.status === "gap");
-      toast("Export blocked",
-            `${summary.gaps} IDP readiness gap${summary.gaps === 1 ? "" : "s"} remaining. First: ${firstGap?.label}.`,
+      toast("Export blocked", `${summary.gaps} readiness gap${summary.gaps === 1 ? "" : "s"} remaining.`,
             { color: C.danger, icon: <I as={Warning20Regular} size={16} color={C.danger}/> });
-      setTab("health");
       return;
     }
     const body = ntExportString(masterKpis, phase, "2026/27");
@@ -1617,239 +1652,30 @@ function IDPDetailView({ cycle, onBack }) {
           { color: "#107c10", icon: <I as={CheckmarkCircle20Filled} size={16} color="#107c10"/> });
   };
 
-  const rows = (() => {
-    switch (tab) {
-      case "kpa":  return KPAS;
-      case "sdo":  return SERVICE_DELIVERY_OUTCOMES;
-      case "iudf": return IUDF_OUTCOMES;
-      case "so":   return objectives;
-      case "po":   return performanceObjectives;
-      case "kpi":  return masterKpis;
-      default:     return [];
-    }
-  })();
-
-  const selected = selectedId ? rows.find((r) => r.id === selectedId) : null;
-
-  // ── Column definitions per tab ─────────────────────────────────────────────
-  const lockedCol = {
-    id: "lock", label: "", get: () => "", width: 38, sortable: false,
-    renderCell: () => (
-      <span title="Treasury-prescribed — read-only" style={{
-        color: C.faint, display: "inline-flex", alignItems: "center",
-      }}><I as={LockClosed20Regular} size={13}/></span>
-    ),
-  };
-
-  const kpaCols = [
-    lockedCol,
-    { id: "code", label: "Code", get: (r) => r.code, width: 100,
-      renderCell: (r) => <span style={{ fontWeight: 700, color: r.color }}>{r.code}</span> },
-    { id: "label", label: "Key Performance Area", get: (r) => r.label, minWidth: 380 },
-    { id: "linked", label: "Strategic Objectives", get: (r) => objectives.filter((o) => o.kpaId === r.id).length,
-      width: 180, align: "right",
-      renderCell: (r) => {
-        const n = objectives.filter((o) => o.kpaId === r.id).length;
-        return <span style={{ fontWeight: 700, color: n ? C.ink : C.faint }}>{n}</span>;
-      } },
+  // Command bar — simplified.
+  const commandGroups = [
+    [
+      ...(!readOnly ? [
+        { icon: Add20Regular, label: "Adopt SO", onClick: () => setShowNewSo(true) },
+        { icon: Add20Regular, label: "Adopt PO", disabled: objectives.length === 0,
+          onClick: () => objectives.length > 0 && setShowNewPo(true) },
+        { icon: Add20Regular, label: "Compose KPI", disabled: performanceObjectives.length === 0,
+          onClick: () => performanceObjectives.length > 0 && setShowNewKpi(true) },
+      ] : []),
+    ],
+    [
+      { icon: CopyArrowRight20Regular, label: "Roll forward",
+        disabled: masterKpis.length === 0, onClick: () => setShowCopy(true) },
+    ],
+    [
+      { right: true, icon: ArrowDownload20Regular, label: "PRTA",
+        disabled: summary.pct < 100, onClick: guardedExport("PRTA") },
+      { right: true, icon: ArrowDownload20Regular, label: "PROR",
+        disabled: summary.pct < 100, onClick: guardedExport("PROR") },
+      { right: true, icon: ArrowDownload20Regular, label: "PRAD",
+        disabled: summary.pct < 100, onClick: guardedExport("PRAD") },
+    ],
   ];
-
-  const sdoCols = [
-    lockedCol,
-    { id: "code", label: "Code", get: (r) => r.code, width: 110,
-      renderCell: (r) => <span style={{ fontWeight: 700, color: C.brand }}>{r.code}</span> },
-    { id: "label", label: "Service Delivery Outcome", get: (r) => r.label, minWidth: 460 },
-    { id: "kpi",  label: "KPIs", get: (r) => masterKpis.filter((k) => k.sdoId === r.id).length,
-      width: 100, align: "right",
-      renderCell: (r) => {
-        const n = masterKpis.filter((k) => k.sdoId === r.id).length;
-        return <span style={{ fontWeight: 700, color: n ? C.ink : C.faint }}>{n}</span>;
-      } },
-  ];
-
-  const iudfCols = [
-    lockedCol,
-    { id: "code", label: "Code", get: (r) => r.code, width: 110,
-      renderCell: (r) => <span style={{ fontWeight: 700, color: C.brandDark || C.brand }}>{r.code}</span> },
-    { id: "label", label: "IUDF priority", get: (r) => r.label, minWidth: 380 },
-    { id: "kpi",  label: "KPIs", get: (r) => masterKpis.filter((k) => k.iudfId === r.id).length,
-      width: 100, align: "right",
-      renderCell: (r) => {
-        const n = masterKpis.filter((k) => k.iudfId === r.id).length;
-        return <span style={{ fontWeight: 700, color: n ? C.ink : C.faint }}>{n}</span>;
-      } },
-  ];
-
-  const soCols = [
-    { id: "code", label: "Code", get: (o) => o.code, width: 90 },
-    { id: "title", label: "Strategic Objective", get: (o) => o.title, minWidth: 320,
-      renderCell: (o) => {
-        const k = kpaById(o.kpaId);
-        return (
-          <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: k.color, letterSpacing: "0.5px",
-                          textTransform: "uppercase", marginBottom: 2 }}>{k.code}</div>
-            <div style={{ fontSize: 12, fontWeight: 600, color: C.ink, lineHeight: 1.35 }}>{o.title}</div>
-          </div>
-        );
-      } },
-    { id: "kpa", label: "KPA", get: (o) => kpaById(o.kpaId).code, filterable: true, width: 90 },
-    { id: "weight", label: "Weight", get: (o) => o.weight || 0, width: 90, align: "right",
-      renderCell: (o) => {
-        const k = kpaById(o.kpaId);
-        return <span style={{ fontWeight: 700, color: k.color }}>{o.weight || 0}%</span>;
-      } },
-    { id: "po", label: "POs", get: (o) => performanceObjectives.filter((p) => p.soId === o.id).length,
-      width: 70, align: "right" },
-    { id: "kpi", label: "KPIs", get: (o) => masterKpis.filter((k) => k.soId === o.id).length,
-      width: 80, align: "right" },
-    { id: "owner", label: "Owner", get: (o) => userById(o.owner).name, filterable: true, width: 180,
-      renderCell: (o) => {
-        const u = userById(o.owner);
-        return (
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <Avatar userId={o.owner} size={22}/>
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 600, whiteSpace: "nowrap" }}>{u.name}</div>
-              <div style={{ fontSize: 9, color: C.muted }}>{u.role}</div>
-            </div>
-          </div>
-        );
-      } },
-  ];
-
-  const poCols = [
-    { id: "code", label: "Code", get: (p) => p.code, width: 110 },
-    { id: "title", label: "Performance Objective", get: (p) => p.title, minWidth: 360 },
-    { id: "so", label: "Parent SO", get: (p) => {
-        const so = objectives.find((o) => o.id === p.soId);
-        return so ? so.code : "—";
-      }, filterable: true, width: 100 },
-    { id: "kpa", label: "KPA", get: (p) => kpaById(p.kpaId).code, filterable: true, width: 90 },
-    { id: "weight", label: "Weight", get: (p) => p.weight || 0, width: 90, align: "right",
-      renderCell: (p) => <span style={{ fontWeight: 700 }}>{p.weight || 0}%</span> },
-    { id: "kpi", label: "KPIs", get: (p) => masterKpis.filter((k) => k.poId === p.id).length,
-      width: 80, align: "right" },
-    { id: "owner", label: "Owner", get: (p) => userById(p.owner).name, filterable: true, width: 180,
-      renderCell: (p) => {
-        const u = userById(p.owner);
-        return (
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <Avatar userId={p.owner} size={22}/>
-            <span style={{ fontSize: 11, fontWeight: 600 }}>{u.name}</span>
-          </div>
-        );
-      } },
-  ];
-
-  const kpiCols = [
-    { id: "code", label: "KPI", get: (k) => k.code, width: 110,
-      renderCell: (k) => <span style={{ fontWeight: 700, color: C.brand }}>{k.code}</span> },
-    { id: "title", label: "Indicator", get: (k) => k.title, minWidth: 320 },
-    { id: "kpa",  label: "KPA",  get: (k) => kpaById(k.kpaId).code, filterable: true, width: 80 },
-    { id: "so",   label: "SO",   get: (k) => objectives.find((o) => o.id === k.soId)?.code || "—",
-      filterable: true, width: 90 },
-    { id: "po",   label: "PO",   get: (k) => performanceObjectives.find((p) => p.id === k.poId)?.code || "—",
-      filterable: true, width: 100 },
-    { id: "sdo",  label: "SDO",  get: (k) => sdoById(k.sdoId)?.code || "—", filterable: true, width: 110 },
-    { id: "iudf", label: "IUDF", get: (k) => iudfById(k.iudfId)?.code || "—", filterable: true, width: 90 },
-    { id: "fy",   label: "FY",   get: (k) => k.fy, filterable: true, width: 90 },
-    { id: "target", label: "Target", get: (k) => k.target ?? -Infinity, width: 110, align: "right",
-      renderCell: (k) => <span style={{ fontWeight: 600 }}>{k.target} {k.unit}</span> },
-  ];
-
-  const cols = ({ kpa: kpaCols, sdo: sdoCols, iudf: iudfCols, so: soCols, po: poCols, kpi: kpiCols })[tab];
-
-  // ── Command-bar actions per tab ────────────────────────────────────────────
-  const commandGroups = (() => {
-    if (tab === "kpa" || tab === "sdo" || tab === "iudf") {
-      return [
-        [
-          { icon: LockClosed20Regular, label: "Treasury-locked",
-            onClick: () => toast("Read-only", "Treasury-prescribed parameters cannot be edited.") },
-        ],
-        [
-          { icon: Sparkle20Regular, label: "Run setup wizard",
-            onClick: () => setShowWizard(true) },
-        ],
-        [
-          { right: true, icon: ArrowDownload20Regular, label: "Export CSV",
-            onClick: () => toast("Exporting", "CSV queued") },
-        ],
-      ];
-    }
-    if (tab === "so") {
-      return [
-        [
-          { icon: Add20Regular, label: "New Strategic Objective",
-            onClick: () => setShowNewSo(true) },
-          { icon: Edit20Regular, label: "Edit", disabled: !selectedId, onClick: () => {} },
-        ],
-        [
-          { icon: Sparkle20Regular, label: "Run setup wizard",
-            onClick: () => setShowWizard(true) },
-        ],
-        [
-          { right: true, icon: ArrowDownload20Regular, label: "Export CSV",
-            onClick: () => toast("Exporting", "CSV queued") },
-        ],
-      ];
-    }
-    if (tab === "po") {
-      return [
-        [
-          { icon: Add20Regular, label: "New Performance Objective",
-            disabled: !hasSOs,
-            onClick: () => hasSOs && setShowNewPo(true) },
-          { icon: Edit20Regular, label: "Edit", disabled: !selectedId, onClick: () => {} },
-        ],
-        [
-          { icon: Sparkle20Regular, label: "Run setup wizard",
-            onClick: () => setShowWizard(true) },
-        ],
-        [
-          { right: true, icon: ArrowDownload20Regular, label: "Export CSV",
-            onClick: () => toast("Exporting", "CSV queued") },
-        ],
-      ];
-    }
-    // kpi
-    return [
-      [
-        { icon: Add20Regular, label: "Compose Master KPI",
-          disabled: !hasPOs,
-          onClick: () => hasPOs && setShowNewKpi(true) },
-        { icon: Edit20Regular, label: "Edit", disabled: !selectedId, onClick: () => {} },
-      ],
-      [
-        { icon: CopyArrowRight20Regular, label: "Roll forward to next FY",
-          disabled: masterKpis.length === 0,
-          onClick: () => setShowCopy(true) },
-        { icon: Sparkle20Regular, label: "Run setup wizard",
-          onClick: () => setShowWizard(true) },
-      ],
-      [
-        { right: true, icon: ArrowDownload20Regular, label: "Tabled IDP (PRTA)",
-          disabled: summary.pct < 100, onClick: guardedExport("PRTA") },
-        { right: true, icon: ArrowDownload20Regular, label: "Original IDP (PROR)",
-          disabled: summary.pct < 100, onClick: guardedExport("PROR") },
-        { right: true, icon: ArrowDownload20Regular, label: "Adjusted IDP (PRAD)",
-          disabled: summary.pct < 100, onClick: guardedExport("PRAD") },
-      ],
-    ];
-  })();
-
-  // ── Drawer routing by tab ──────────────────────────────────────────────────
-  const drawerFor = (row) => {
-    if (!row) return null;
-    if (tab === "kpa")  return <LockedEntityDrawer row={row} kind="kpa"  onClose={() => setSelectedId(null)}/>;
-    if (tab === "sdo")  return <LockedEntityDrawer row={row} kind="sdo"  onClose={() => setSelectedId(null)}/>;
-    if (tab === "iudf") return <LockedEntityDrawer row={row} kind="iudf" onClose={() => setSelectedId(null)}/>;
-    if (tab === "so")   return <SODrawer  so={row}  onClose={() => setSelectedId(null)}/>;
-    if (tab === "po")   return <PODrawer  po={row}  onClose={() => setSelectedId(null)}/>;
-    if (tab === "kpi")  return <KPIDrawer kpi={row} onClose={() => setSelectedId(null)}/>;
-    return null;
-  };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
@@ -1867,106 +1693,204 @@ function IDPDetailView({ cycle, onBack }) {
         }
         subtitle={
           <span style={{ display: "inline-flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            <span>{cycle.term} · {cycle.reviewYear}</span>
+            <span>{cycle.term}</span>
             <span style={{ opacity: 0.4 }}>·</span>
             <ReadinessMeter summary={summary} size="sm"/>
-            {summary.pct < 100 && tab !== "health" && (
-              <button onClick={() => setTab("health")} style={{
-                background: "none", border: "none", cursor: "pointer",
-                color: C.brand, fontFamily: "inherit", fontSize: 11, fontWeight: 600, padding: 0,
-              }}>
-                See {summary.gaps} gap{summary.gaps === 1 ? "" : "s"} →
-              </button>
-            )}
           </span>
         }
-        action={tab === "kpi" && masterKpis.length === 0 && !readOnly
-          ? <Btn onClick={() => setShowWizard(true)}><I as={Sparkle20Regular} size={14}/> Run setup wizard</Btn>
-          : null}
         commandBar={<CommandBar groups={commandGroups}/>}
       />
-      <TabStrip active={tab} onSelect={(id) => { setTab(id); setSelectedId(null); }}/>
 
-      {(tab === "kpa" || tab === "so") && (
-        <KPABalanceBar objectives={objectives} bands={cycle.kpaBands}/>
+      <div style={{ flex: 1, overflow: "auto", padding: "16px 22px" }}>
+        {/* Step 1: KPA coverage */}
+        <StepSection step={1} label="KPA coverage — Adopt Strategic Objectives"
+                     hint="Each of the 5 Treasury KPAs must have at least one Strategic Objective."
+                     complete={step1Done} inProgress={!step1Done && objectives.length > 0}
+                     expanded={expanded === 1} onToggle={() => toggle(1)}
+                     count={KPAS.filter((k) => objectives.some((o) => o.kpaId === k.id)).length} total={5}>
+          <div style={{ marginTop: 12 }}>
+            {KPAS.map((k) => {
+              const kpaSOs = objectives.filter((o) => o.kpaId === k.id);
+              return (
+                <div key={k.id} style={{
+                  display: "flex", alignItems: "flex-start", gap: 12,
+                  padding: "10px 12px", borderBottom: `1px solid ${C.surfaceMute}`,
+                }}>
+                  <div style={{
+                    width: 28, height: 28, borderRadius: 4, background: k.color,
+                    color: "#fff", display: "grid", placeItems: "center",
+                    fontWeight: 700, fontSize: 11, flexShrink: 0, marginTop: 2,
+                  }}>{k.code.replace("KPA ", "")}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: C.ink }}>{k.label}</div>
+                    {kpaSOs.length > 0 ? (
+                      <div style={{ marginTop: 6, display: "flex", flexDirection: "column", gap: 4 }}>
+                        {kpaSOs.map((o) => (
+                          <div key={o.id} onClick={() => openDrawer("so", o.id)}
+                               style={{ fontSize: 11, color: C.muted, cursor: "pointer",
+                                        display: "flex", alignItems: "center", gap: 6 }}>
+                            <I as={CheckmarkCircle20Filled} size={12} color={C.success}/>
+                            <span>{o.code} · {o.title}</span>
+                            <span style={{ color: k.color, fontWeight: 700, marginLeft: "auto" }}>{o.weight}%</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: 11, color: C.warning, fontWeight: 600, marginTop: 4 }}>Not yet covered</div>
+                    )}
+                  </div>
+                  {!readOnly && (
+                    <Btn variant="secondary" size="sm"
+                         onClick={() => { setNewSoDefaultKpa(k.id); setShowNewSo(true); }}>+ Adopt SO</Btn>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </StepSection>
+
+        {/* Step 2: PO decomposition */}
+        <StepSection step={2} label="PO decomposition — Adopt Performance Objectives"
+                     hint="Each Strategic Objective must have at least one Performance Objective."
+                     complete={step2Done} inProgress={step1Done && !step2Done && performanceObjectives.length > 0}
+                     expanded={expanded === 2} onToggle={() => toggle(2)}
+                     count={objectives.filter((o) => performanceObjectives.some((p) => p.soId === o.id)).length}
+                     total={objectives.length}>
+          <div style={{ marginTop: 12 }}>
+            {!step1Done && (
+              <div style={{ fontSize: 12, color: C.warning, fontStyle: "italic", marginBottom: 12 }}>
+                Complete Step 1 first — adopt at least one SO under each KPA.
+              </div>
+            )}
+            {objectives.map((o) => {
+              const k = kpaById(o.kpaId);
+              const pos = performanceObjectives.filter((p) => p.soId === o.id);
+              const allocated = pos.reduce((s, p) => s + (p.weight || 0), 0);
+              return (
+                <div key={o.id} style={{
+                  padding: "10px 12px", borderBottom: `1px solid ${C.surfaceMute}`,
+                  display: "flex", alignItems: "flex-start", gap: 12,
+                }}>
+                  <div style={{
+                    width: 22, height: 22, borderRadius: "50%",
+                    background: pos.length > 0 ? C.successBg : C.warningBg,
+                    color: pos.length > 0 ? C.success : C.warning,
+                    display: "grid", placeItems: "center", flexShrink: 0, marginTop: 2,
+                  }}><I as={pos.length > 0 ? CheckmarkCircle20Filled : Warning20Regular} size={12}/></div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: k.color }}>{k.code} · {o.code}</div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: C.ink, cursor: "pointer" }}
+                         onClick={() => openDrawer("so", o.id)}>{o.title}</div>
+                    <div style={{ fontSize: 10, color: C.muted, marginTop: 2 }}>
+                      Weight: {o.weight}% · PO allocated: {allocated}% / {o.weight}%
+                    </div>
+                    {pos.map((p) => (
+                      <div key={p.id} onClick={() => openDrawer("po", p.id)}
+                           style={{ fontSize: 11, color: C.muted, cursor: "pointer", marginTop: 3,
+                                    display: "flex", alignItems: "center", gap: 6 }}>
+                        <I as={CheckmarkCircle20Filled} size={11} color={C.success}/>
+                        {p.code} · {p.title} · <strong>{p.weight}%</strong>
+                      </div>
+                    ))}
+                  </div>
+                  {!readOnly && (
+                    <Btn variant="secondary" size="sm" onClick={() => setShowNewPo(true)}>+ Adopt PO</Btn>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </StepSection>
+
+        {/* Step 3: KPI composition */}
+        <StepSection step={3} label="KPI composition — Compose Master KPIs"
+                     hint="Bind SOs + POs to Service Delivery Outcomes and IUDF priorities."
+                     complete={step3Done} inProgress={step2Done && !step3Done && masterKpis.length > 0}
+                     expanded={expanded === 3} onToggle={() => toggle(3)}
+                     count={masterKpis.length} total={null}>
+          <div style={{ marginTop: 12 }}>
+            {!step2Done && (
+              <div style={{ fontSize: 12, color: C.warning, fontStyle: "italic", marginBottom: 12 }}>
+                Complete Step 2 first — each SO needs at least one PO.
+              </div>
+            )}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
+              <div style={{ background: C.surfaceAlt, borderRadius: 4, padding: "10px 14px" }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.4px", marginBottom: 4 }}>SDO coverage</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div style={{ flex: 1, height: 6, background: C.surfaceMute, borderRadius: 100, overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${(sdoCovCount / 14) * 100}%`, background: sdoCovCount === 14 ? C.success : C.brand, borderRadius: 100 }}/>
+                  </div>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: sdoCovCount === 14 ? C.success : C.brand }}>{sdoCovCount}/14</span>
+                </div>
+              </div>
+              <div style={{ background: C.surfaceAlt, borderRadius: 4, padding: "10px 14px" }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.4px", marginBottom: 4 }}>IUDF coverage</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div style={{ flex: 1, height: 6, background: C.surfaceMute, borderRadius: 100, overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${(iudfCovCount / 4) * 100}%`, background: iudfCovCount === 4 ? C.success : C.brand, borderRadius: 100 }}/>
+                  </div>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: iudfCovCount === 4 ? C.success : C.brand }}>{iudfCovCount}/4</span>
+                </div>
+              </div>
+            </div>
+            {performanceObjectives.map((p) => {
+              const k = kpaById(p.kpaId);
+              const so = objectives.find((o) => o.id === p.soId);
+              const kpis = masterKpis.filter((m) => m.poId === p.id);
+              return (
+                <div key={p.id} style={{ padding: "10px 12px", borderBottom: `1px solid ${C.surfaceMute}`, display: "flex", alignItems: "flex-start", gap: 12 }}>
+                  <div style={{ width: 22, height: 22, borderRadius: "50%", background: kpis.length > 0 ? C.successBg : C.surfaceMute, color: kpis.length > 0 ? C.success : C.faint, display: "grid", placeItems: "center", flexShrink: 0, marginTop: 2 }}>
+                    {kpis.length > 0 ? <I as={CheckmarkCircle20Filled} size={12}/> : <span style={{ fontSize: 10, fontWeight: 700 }}>0</span>}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: k.color }}>{k.code} · {so?.code} · {p.code}</div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: C.ink, cursor: "pointer" }} onClick={() => openDrawer("po", p.id)}>{p.title}</div>
+                    {kpis.map((m) => (
+                      <div key={m.id} onClick={() => openDrawer("kpi", m.id)}
+                           style={{ fontSize: 11, color: C.muted, cursor: "pointer", marginTop: 3, display: "flex", alignItems: "center", gap: 6 }}>
+                        <I as={Sparkle20Regular} size={11} color={C.brand}/>{m.code} · {m.title}
+                      </div>
+                    ))}
+                  </div>
+                  {!readOnly && <Btn variant="secondary" size="sm" onClick={() => setShowNewKpi(true)}>+ Compose KPI</Btn>}
+                </div>
+              );
+            })}
+          </div>
+        </StepSection>
+
+        {/* Step 4: KPA balance */}
+        <StepSection step={4} label="KPA balance — Review weight distribution"
+                     hint="Each KPA's allocated weight must sit inside its Treasury envelope."
+                     complete={step4Done} inProgress={step3Done && !step4Done}
+                     expanded={expanded === 4} onToggle={() => toggle(4)}
+                     count={KPAS.filter((k) => kpaBandStatus(k.id, objectives, cycle.kpaBands).state === "ok").length} total={5}>
+          <div style={{ marginTop: 12 }}>
+            <KPABalanceBar objectives={objectives} bands={cycle.kpaBands}/>
+          </div>
+        </StepSection>
+      </div>
+
+      {drawerEntity && (
+        <Drawer onClose={closeDrawer} width={640}
+                onPrev={drawerIdx > 0 ? () => setDrawerId(drawerList[drawerIdx - 1].id) : null}
+                onNext={drawerIdx < drawerList.length - 1 ? () => setDrawerId(drawerList[drawerIdx + 1].id) : null}>
+          {drawerType === "so" && <SODrawer so={drawerEntity} onClose={closeDrawer}/>}
+          {drawerType === "po" && <PODrawer po={drawerEntity} onClose={closeDrawer}/>}
+          {drawerType === "kpi" && <KPIDrawer kpi={drawerEntity} onClose={closeDrawer}/>}
+        </Drawer>
       )}
 
-      {tab === "po" && !hasSOs && (
-        <PrereqBanner
-          message="A Performance Objective must sit under a Strategic Objective. Create at least one SO first."
-          actionLabel="Go to Strategic Objectives"
-          onAction={() => setTab("so")}/>
-      )}
-      {tab === "kpi" && !hasPOs && (
-        <PrereqBanner
-          message="A Master KPI must sit under a Performance Objective. Create at least one PO first."
-          actionLabel="Go to Performance Objectives"
-          onAction={() => setTab("po")}/>
-      )}
-
-      {tab === "health" ? (
-        <IDPHealthPanel checks={checks} onResolve={resolveCheck}/>
-      ) : (
-        <DataTable
-          rows={rows}
-          columns={cols}
-          getKey={(r) => r.id}
-          searchPlaceholder={`Search ${tabMeta?.label?.toLowerCase()}…`}
-          searchKeys={["code", "title", "label"]}
-          defaultSort={{ col: "code", dir: "asc" }}
-          onRowClick={(r) => setSelectedId(r.id)}
-          selectedKey={selectedId}
-          emptyMessage={
-            tab === "po"  ? "No Performance Objectives yet."
-          : tab === "kpi" ? "No Master KPIs yet — run the setup wizard to compose your first."
-          : tab === "so"  ? "No Strategic Objectives yet."
-          : "No records."
-          }
-        />
-      )}
-
-      {selected && (() => {
-        const idx = rows.findIndex((r) => r.id === selectedId);
-        return (
-          <Drawer onClose={() => setSelectedId(null)} width={640}
-                  onPrev={idx > 0 ? () => setSelectedId(rows[idx - 1].id) : null}
-                  onNext={idx < rows.length - 1 ? () => setSelectedId(rows[idx + 1].id) : null}>
-            {drawerFor(selected)}
-          </Drawer>
-        );
-      })()}
-
-      {showNewSo  && (
-        <NewSOForm
-          defaultKpaId={newSoDefaultKpa}
-          cycleId={cycle.id}
-          cycleBands={cycle.kpaBands}
-          onClose={() => { setShowNewSo(false); setNewSoDefaultKpa(""); }}/>
-      )}
-      {showNewPo  && (
-        <NewPOForm
-          cycleId={cycle.id}
-          onClose={() => setShowNewPo(false)}/>
-      )}
-      {showNewKpi && (
-        <NewKPIForm
-          defaultSdoId={newKpiDefaultSdo}
-          defaultIudfId={newKpiDefaultIudf}
-          cycleId={cycle.id}
-          onClose={() => {
-            setShowNewKpi(false);
-            setNewKpiDefaultSdo("");
-            setNewKpiDefaultIudf("");
-          }}/>
-      )}
-      {showCopy   && <CopyKpisForm onClose={() => setShowCopy(false)}/>}
-      {showWizard && (
-        <SetupWizard
-          onClose={() => setShowWizard(false)}
-          onFinish={() => { setTab("kpi"); toast("Setup complete", "Master KPI catalogue initialised",
-                                              { color: "#107c10",
-                                                icon: <I as={CheckmarkCircle20Filled} size={16} color="#107c10"/> }); }}/>
-      )}
+      {showNewSo && <NewSOForm defaultKpaId={newSoDefaultKpa} cycleId={cycle.id} cycleBands={cycle.kpaBands}
+                               onClose={() => { setShowNewSo(false); setNewSoDefaultKpa(""); }}/>}
+      {showNewPo && <NewPOForm cycleId={cycle.id} onClose={() => setShowNewPo(false)}/>}
+      {showNewKpi && <NewKPIForm defaultSdoId={newKpiDefaultSdo} defaultIudfId={newKpiDefaultIudf} cycleId={cycle.id}
+                                 onClose={() => { setShowNewKpi(false); setNewKpiDefaultSdo(""); setNewKpiDefaultIudf(""); }}/>}
+      {showCopy && <CopyKpisForm onClose={() => setShowCopy(false)}/>}
+      {showWizard && <SetupWizard onClose={() => setShowWizard(false)}
+                                  onFinish={() => toast("Setup complete", "KPI catalogue initialised",
+                                                        { color: "#107c10", icon: <I as={CheckmarkCircle20Filled} size={16} color="#107c10"/> })}/>}
     </div>
   );
 }
