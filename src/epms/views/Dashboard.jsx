@@ -23,11 +23,11 @@ import { setIntent } from "../intents.js";
 
 // ─── Demo-script overrides (mid-year FY26/27 snapshot) ────────────────────────
 const KPA_PROGRESS = {
-  kpa1: { value: 66, status: "amber" },
-  kpa2: { value: 70, status: "amber" },
-  kpa3: { value: 54, status: "red"   },
-  kpa4: { value: 85, status: "green" },
-  kpa5: { value: 84, status: "green" },
+  kpa1: { value: 67, status: "amber" },  // Social Protection — beneficiaries on track, assessments at risk
+  kpa2: { value: 41, status: "red"   },  // Children & Families — child protection behind
+  kpa3: { value: 70, status: "amber" },  // Community Development — forums on track, NPO moderate
+  kpa4: { value: 54, status: "amber" },  // Substance Abuse — beds below target
+  kpa5: { value: 84, status: "green" },  // Good Governance — PA signing improving
 };
 const TOP_LAYER_SDBIP_YTD   = 62;
 const TOP_LAYER_PROJECTED   = 78;
@@ -42,12 +42,12 @@ const QTR_TREND             = [
   { q: "Q4*", value: TOP_LAYER_PROJECTED, projected: true },
 ];
 
-// "SDBIP Targets Requiring Attention" — exactly per the demo script.
+// "APP Targets Requiring Attention" — per demo script.
 const ATTENTION = [
-  { id: "att-1",   code: "T-001",  title: "Namakgale electricity coverage",        ward: "w4",  actual: 47, target: 75, status: "amber",  cascade: null },
-  { id: "att-2",   code: "T-014",  title: "Lulekani internal roads paved",          ward: "w2",  actual: 52, target: 70, status: "amber",  cascade: null },
-  { id: "att-3",   code: "T-021",  title: "Sewer manhole cover replacement programme", ward: "w8",  actual: 18, target: 60, status: "red",    cascade: null },
-  { id: "att-4",   code: "SD-T-005", title: "Reduce outstanding consumer debt R 487m → R 412m", ward: null, actual: 56, target: 100, status: "red", cascade: "sd5" },
+  { id: "att-1", code: "APP-T-002", title: "Social work assessments completed within 30 days",       ward: "w1",  actual: 61, target: 75, status: "amber", cascade: null },
+  { id: "att-2", code: "APP-T-004", title: "Child protection cases responded to within 24 hours",    ward: null,  actual: 44, target: 70, status: "red",   cascade: null },
+  { id: "att-3", code: "APP-T-009", title: "Substance abuse treatment beds occupied",                ward: "w4",  actual: 58, target: 75, status: "amber", cascade: null },
+  { id: "att-4", code: "APP-T-007", title: "AGSA audit findings cleared from prior year (4 of 28)", ward: null,  actual: 14, target: 36, status: "red",   cascade: "sd7" },
 ];
 
 // ─── Small primitives ────────────────────────────────────────────────────────
@@ -212,17 +212,17 @@ export function DashboardView({ setActive }) {
           display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
           gap: 14, marginBottom: 22,
         }}>
-          <StatCard icon={DataHistogram20Regular} label="Top-Layer SDBIP YTD"
+          <StatCard icon={DataHistogram20Regular} label="Top-Layer APP YTD"
                     value={`${TOP_LAYER_SDBIP_YTD}%`}
                     sub={`Projected ${TOP_LAYER_PROJECTED}% vs ${TOP_LAYER_TARGET}% target`}
                     color={C.brand} accent/>
-          <StatCard icon={Money20Regular} label="mSCOA spend"
+          <StatCard icon={Money20Regular} label="Budget spend"
                     value={formatZAR(MSCOA_SPEND)}
                     sub={`of ${formatZAR(MSCOA_BUDGET)} budget · ${Math.round((MSCOA_SPEND/MSCOA_BUDGET)*100)}%`}
-                    color="#1D4FD7" accent/>
-          <StatCard icon={Building20Regular} label="Outstanding consumer debt"
-                    value={formatZAR(MUNICIPALITY.outstandingConsumerDebt)}
-                    sub="Target FY27: R350m" color={C.danger} accent/>
+                    color="#1B3A6B" accent/>
+          <StatCard icon={Building20Regular} label="Active beneficiaries"
+                    value={(MUNICIPALITY.activeBeneficiaries || 0).toLocaleString()}
+                    sub="YTD · annual target: 85,000" color={C.success} accent/>
           <StatCard icon={PersonAvailable20Regular} label="Staff performance avg"
                     value={`${STAFF_PERF_AVERAGE.toFixed(1)} / 5`}
                     sub={`across ${MUNICIPALITY.staffEstablishment} employees`}
@@ -241,12 +241,12 @@ export function DashboardView({ setActive }) {
           }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
               <div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: C.ink }}>Constitutional KPA progress</div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: C.ink }}>Departmental KPA progress</div>
                 <div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>
-                  Five Key Performance Areas · weighted per IDP · mid-year FY26/27
+                  Five Key Performance Areas · weighted per Strategic Plan · mid-year FY26/27
                 </div>
               </div>
-              <Pill bg={C.brandTint} fg={C.brand} uppercase={false}>2 amber · 1 red</Pill>
+              <Pill bg={C.brandTint} fg={C.brand} uppercase={false}>3 amber · 1 red</Pill>
             </div>
             {KPAS.map((k) => {
               const p = KPA_PROGRESS[k.id];
@@ -270,7 +270,7 @@ export function DashboardView({ setActive }) {
                           fontSize: 11, color: C.muted, lineHeight: 1.5 }}>
               Trajectory holds: <strong style={{ color: C.text }}>{TOP_LAYER_PROJECTED}% projected</strong>
               {" "}against an <strong style={{ color: C.warning }}>{TOP_LAYER_TARGET}% target</strong>.
-              Risk concentrated in <strong style={{ color: C.danger }}>KPA3 Financial Viability</strong>.
+              Risk concentrated in <strong style={{ color: C.danger }}>KPA2 Children & Families</strong>.
             </div>
           </div>
         </div>
@@ -285,9 +285,9 @@ export function DashboardView({ setActive }) {
             display: "flex", alignItems: "center", justifyContent: "space-between",
           }}>
             <div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: C.ink }}>SDBIP targets requiring attention</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: C.ink }}>APP targets requiring attention</div>
               <div style={{ fontSize: 11, color: C.muted, marginTop: 1 }}>
-                Each item has a ward, an owner, and an evidence trail · click to drill into the cascade
+                Each item has a district, an owner, and an evidence trail · click to drill into the cascade
               </div>
             </div>
             <Btn size="sm" variant="ghost" onClick={() => setActive("sdbip")}>
@@ -327,7 +327,7 @@ export function DashboardView({ setActive }) {
                     </div>
                     {it.ward && (
                       <div style={{ fontSize: 10, color: C.muted, marginTop: 2 }}>
-                        Ward: {it.ward.replace("w", "")} · KPA-linked
+                        District: {it.ward.replace("w", "")} · KPA-linked
                       </div>
                     )}
                   </div>
@@ -368,7 +368,7 @@ export function DashboardView({ setActive }) {
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
               <div>
                 <div style={{ fontSize: 13, fontWeight: 700, color: C.ink }}>Statutory deadlines</div>
-                <div style={{ fontSize: 10, color: C.muted, marginTop: 1 }}>MFMA · MSA · upcoming 90 days</div>
+                <div style={{ fontSize: 10, color: C.muted, marginTop: 1 }}>PFMA · Children's Act · upcoming 90 days</div>
               </div>
               <span onClick={() => setActive("audit")} style={{
                 fontSize: 11, color: C.brand, cursor: "pointer", fontWeight: 600,

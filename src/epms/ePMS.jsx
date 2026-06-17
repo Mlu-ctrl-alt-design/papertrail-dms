@@ -8,6 +8,7 @@ import {
   ContactCard20Regular, ShieldLock20Regular, Document20Regular,
   ChevronDown20Regular, Add20Regular, Alert20Regular,
   Calendar20Regular, ArrowSwap20Regular, Checkmark20Regular,
+  TaskListLtr20Regular,
 } from "@fluentui/react-icons";
 import {
   GlobalStyles, ToastProvider, Sidebar, TopBar, TopBarIconBtn, AppShellRoot,
@@ -25,14 +26,16 @@ import { SDBIPView } from "./views/SDBIP.jsx";
 import { IPMSView } from "./views/IPMS.jsx";
 import { POEView } from "./views/POE.jsx";
 import { AuditView } from "./views/Audit.jsx";
+import { WorkMgmtView } from "./views/WorkMgmt.jsx";
 
 const NAV = [
-  { id: "dashboard", label: "Dashboard",        icon: Home20Regular },
-  { id: "idp",       label: "IDP & Risk",        icon: Flag20Regular },
-  { id: "sdbip",     label: "SDBIP & mSCOA",     icon: DataHistogram20Regular },
-  { id: "ipms",      label: "IPMS",              icon: ContactCard20Regular },
-  { id: "poe",       label: "POE Vault",         icon: Document20Regular },
-  { id: "audit",     label: "Audit & Compliance",icon: ShieldLock20Regular },
+  { id: "dashboard", label: "Dashboard",          icon: Home20Regular },
+  { id: "idp",       label: "IDP & Risk",          icon: Flag20Regular },
+  { id: "sdbip",     label: "APP & Budget",          icon: DataHistogram20Regular },
+  { id: "ipms",      label: "IPMS",                icon: ContactCard20Regular },
+  { id: "poe",       label: "POE Vault",           icon: Document20Regular },
+  { id: "workmgmt",  label: "Work Management",     icon: TaskListLtr20Regular },
+  { id: "audit",     label: "Audit & Compliance",  icon: ShieldLock20Regular },
 ];
 
 const VIEWS = {
@@ -41,23 +44,31 @@ const VIEWS = {
   sdbip:     SDBIPView,
   ipms:      IPMSView,
   poe:       POEView,
+  workmgmt:  WorkMgmtView,
   audit:     AuditView,
 };
 
 function Brand() {
   const compact = useMaxWidth(BP.md);
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0, minWidth: 0 }}>
-      <img src="/logo.svg" alt="Ezra mSCOA"
-           style={{ height: 32, filter: "brightness(0) invert(1)", flexShrink: 0 }}/>
+    <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0, minWidth: 0 }}>
+      <div style={{
+        background: "#fff", borderRadius: 4, padding: "3px 8px",
+        display: "inline-flex", alignItems: "center", flexShrink: 0,
+        boxShadow: "0 1px 4px rgba(0,0,0,0.18)",
+      }}>
+        <img src="/gpdsd-logo.png" alt="Gauteng DSD"
+             style={{ height: 34, width: "auto", display: "block" }}/>
+      </div>
       {!compact && (
-        <div style={{ display: "flex", flexDirection: "column", lineHeight: 1.1, minWidth: 0 }}>
-          <span style={{ color: "#fff", fontSize: 13, fontWeight: 700, letterSpacing: "0.2px" }}>
-            Ezra <span style={{ opacity: 0.85, fontWeight: 600 }}>mSCOA</span>
+        <div style={{ display: "flex", flexDirection: "column", lineHeight: 1.2, minWidth: 0 }}>
+          <span style={{ color: "#fff", fontSize: 12, fontWeight: 700, letterSpacing: "0.2px",
+                         whiteSpace: "nowrap" }}>
+            Ezra <span style={{ opacity: 0.85, fontWeight: 600 }}>IPMS</span>
           </span>
-          <span style={{ color: "rgba(255,255,255,0.78)", fontSize: 10, fontWeight: 600,
+          <span style={{ color: "rgba(255,255,255,0.72)", fontSize: 9, fontWeight: 600,
                          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {MUNICIPALITY.code} · {MUNICIPALITY.name}
+            {MUNICIPALITY.code}
           </span>
         </div>
       )}
@@ -230,10 +241,11 @@ function QuickAdd({ setActive }) {
     return () => document.removeEventListener("mousedown", h);
   }, [open]);
   const items = [
-    { label: "Capture mSCOA journal", sub: "7-segment classification at point of entry",
+    { label: "Post BAS budget entry", sub: "Budget & Accounting System — 7-segment classification",
       icon: DataHistogram20Regular, action: () => setActive("sdbip") },
     { label: "Upload POE",            sub: "SHA-256 hashed · immutable", icon: Document20Regular, action: () => setActive("poe") },
     { label: "New Section 56 PA",     sub: "Digital signature · ECTA-compliant", icon: ContactCard20Regular, action: () => setActive("ipms") },
+    { label: "New work item",         sub: "Assign, prioritise · SLA from service catalogue", icon: TaskListLtr20Regular, action: () => setActive("workmgmt") },
     { label: "Log strategic risk",    sub: "Linked to IDP objective", icon: ShieldLock20Regular, action: () => setActive("idp") },
   ];
   return (
@@ -286,7 +298,7 @@ function ShellChrome({ setActive, setCollapsed, setShowCmd }) {
       brand={<Brand/>}
       onToggleSidebar={() => setCollapsed((c) => !c)}
       onCmdPalette={() => setShowCmd((v) => !v)}
-      searchPlaceholder="Search objectives, SDBIP targets, KPIs, evidence…"
+      searchPlaceholder="Search objectives, APP targets, KPIs, evidence…"
       right={
         <>
           {canQuickAdd && <QuickAdd setActive={setActive}/>}
@@ -345,7 +357,8 @@ function NavBadges(state) {
   }).length;
   const unsignedPAs = state.performanceAgreements.filter((p) => !p.signed).length;
   const unverifiedPOE = state.poeDocuments.filter((p) => !p.verified).length;
-  return { audit: upcoming, ipms: unsignedPAs, poe: unverifiedPOE };
+  const overdueWork = (state.workItems || []).filter((w) => w.status !== "Closed" && daysFrom(w.dueDate) < 0).length;
+  return { audit: upcoming, ipms: unsignedPAs, poe: unverifiedPOE, workmgmt: overdueWork };
 }
 
 function ComplianceStatusFooter({ collapsed }) {
@@ -362,9 +375,9 @@ function ComplianceStatusFooter({ collapsed }) {
     );
   }
   const items = [
-    { label: "MFMA Circular 13",    status: "Compliant",   color: C.success },
-    { label: "mSCOA v6.6",          status: "Active",       color: C.success },
-    { label: "Staff Regulations 2021", status: "2 reviews due", color: "#7a5700" },
+    { label: "PFMA s.40 Reporting",  status: "Compliant",  color: C.success },
+    { label: "DPSA Circular 4/23",   status: "Active",      color: C.success },
+    { label: "Section 38/45 PAs",    status: "2 unsigned",  color: "#7a5700" },
   ];
   return (
     <div style={{
@@ -426,7 +439,7 @@ function ShellInner() {
     .map((n) => ({
       ...n,
       icon: <I as={n.icon} size={18}/>,
-      badge: { audit: badges.audit, ipms: badges.ipms, poe: badges.poe }[n.id] || 0,
+      badge: { audit: badges.audit, ipms: badges.ipms, poe: badges.poe, workmgmt: badges.workmgmt }[n.id] || 0,
     }));
 
   const ActiveView = (allowed.has(active) ? VIEWS[active] : VIEWS.dashboard) || DashboardView;

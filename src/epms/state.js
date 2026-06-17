@@ -7,6 +7,7 @@ import {
   SDBIP_TARGETS, MSCOA_TRANSACTIONS, CAPITAL_PROJECTS,
   PERFORMANCE_AGREEMENTS, INDIVIDUAL_KPIS,
   POE_DOCUMENTS, COMPLIANCE_DEADLINES, ACTIVITY,
+  WORK_ITEMS,
   CURRENT_USER,
 } from "./data.js";
 
@@ -22,6 +23,7 @@ export const initialState = {
   individualKpis: INDIVIDUAL_KPIS,
   poeDocuments: POE_DOCUMENTS,
   complianceDeadlines: COMPLIANCE_DEADLINES,
+  workItems: WORK_ITEMS,
   activity: ACTIVITY,
   currentUser: CURRENT_USER,
 };
@@ -92,6 +94,18 @@ export function epmsReducer(state, action) {
     // Persona switcher — used by the demo TopBar to swap which user is "logged
     // in." This affects sidebar nav (row-level access), the dashboard
     // greeting, and the active IPMS scorecard (clerk view).
+    case "ADD_WORK_ITEM":
+      return logActivity({
+        ...state,
+        workItems: [action.item, ...state.workItems],
+      }, { userId: state.currentUser.id, action: "Created work item", target: action.item.title });
+
+    case "UPDATE_WORK_ITEM":
+      return logActivity({
+        ...state,
+        workItems: state.workItems.map((w) => w.id === action.id ? { ...w, ...action.patch } : w),
+      }, { userId: state.currentUser.id, action: "Updated work item", target: action.id });
+
     case "SWITCH_PERSONA":
       return { ...state, currentUser: action.user };
 

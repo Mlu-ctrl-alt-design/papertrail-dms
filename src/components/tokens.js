@@ -2,11 +2,13 @@
 // Both the DMS and e-PMS prototypes import from here.
 
 export const C = {
-  // Brand
-  brand: "#219CD6",
-  brandDark: "#1D4FD7",
-  brandTint: "#deecf9",
-  brandTintSoft: "#e8f4fc",
+  // Brand — Gauteng Province DSD: shield navy + crest gold
+  brand: "#1B3A6B",
+  brandDark: "#152D55",
+  brandTint: "#E5EAF4",
+  brandTintSoft: "#EEF1F9",
+  gold: "#C9960A",
+  goldBg: "#FDF4DC",
 
   // Neutrals
   ink: "#201f1e",
@@ -29,7 +31,7 @@ export const C = {
   info: "#0078d4",
 
   // Accent set used for avatars / category accents
-  accents: ["#219CD6", "#107c10", "#8764b8", "#005a9e", "#c8a116", "#a4262c"],
+  accents: ["#1B3A6B", "#107c10", "#8764b8", "#C9960A", "#005a9e", "#a4262c"],
 };
 
 export const R = { sm: 4, md: 6, lg: 8, pill: 100 };

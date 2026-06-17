@@ -169,7 +169,7 @@ export function TopBar({
 
 // ─── Layout wrapper ───────────────────────────────────────────────────────────
 // Vertical: TopBar (children) above; horizontal split: Sidebar | Main.
-export function AppShellRoot({ children, background = "linear-gradient(150deg,#e8f4fc 0%,#f3f3f1 45%,#faf9f8 100%)" }) {
+export function AppShellRoot({ children, background = "linear-gradient(150deg,#eaeff6 0%,#f0f3f7 35%,#faf9f8 100%)" }) {
   return (
     <div style={{
       display: "flex", flexDirection: "column",
