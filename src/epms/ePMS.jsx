@@ -1,6 +1,5 @@
-// Ezra mSCOA — municipal Standard Chart of Accounts performance platform.
-// Pilot: Ba-Phalaborwa Local Municipality (LIM334).
-// Built on the same Fluent 2 design system as the Ezra360 DMS.
+// Gauteng DSD IPMS — Individual Performance Management System.
+// Gauteng Department of Social Development.
 
 import { useContext, useEffect, useRef, useState } from "react";
 import {
@@ -57,14 +56,14 @@ function Brand() {
         display: "inline-flex", alignItems: "center", flexShrink: 0,
         boxShadow: "0 1px 4px rgba(0,0,0,0.18)",
       }}>
-        <img src="/gpdsd-logo.png" alt="Gauteng DSD"
+        <img src="/gpdsd-logo.png" alt="Gauteng Department of Social Development"
              style={{ height: 34, width: "auto", display: "block" }}/>
       </div>
       {!compact && (
         <div style={{ display: "flex", flexDirection: "column", lineHeight: 1.2, minWidth: 0 }}>
           <span style={{ color: "#fff", fontSize: 12, fontWeight: 700, letterSpacing: "0.2px",
                          whiteSpace: "nowrap" }}>
-            Ezra <span style={{ opacity: 0.85, fontWeight: 600 }}>IPMS</span>
+            IPMS
           </span>
           <span style={{ color: "rgba(255,255,255,0.72)", fontSize: 9, fontWeight: 600,
                          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
