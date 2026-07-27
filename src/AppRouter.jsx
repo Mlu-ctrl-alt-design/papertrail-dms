@@ -12,9 +12,11 @@
 import { useEffect, useState } from "react";
 import DMS from "./PaperTrailDMS.jsx";
 import EPMS from "./epms/ePMS.jsx";
+import PAYROLL from "./payroll/Payroll.jsx";
 
 function readApp() {
   const h = (typeof window !== "undefined" ? window.location.hash : "") || "";
+  if (h.includes("payroll")) return "payroll";
   if (h.includes("epms")) return "epms";
   return "dms";
 }
@@ -31,6 +33,7 @@ function AppSwitcher({ app, onSwitch }) {
       {[
         { id: "dms",  label: "DMS"   },
         { id: "epms", label: "mSCOA" },
+        { id: "payroll", label: "Payroll" },
       ].map((a) => (
         <button key={a.id} onClick={() => onSwitch(a.id)} style={{
           background: app === a.id ? "#219CD6" : "transparent",
@@ -61,7 +64,7 @@ export default function AppRouter() {
 
   return (
     <>
-      {app === "epms" ? <EPMS/> : <DMS/>}
+      {app === "payroll" ? <PAYROLL/> : app === "epms" ? <EPMS/> : <DMS/>}
       <AppSwitcher app={app} onSwitch={switchTo}/>
     </>
   );
