@@ -221,12 +221,18 @@ export function Tag({ label, onRemove, color = C.brand }) {
 
 // ─── Pill ─────────────────────────────────────────────────────────────────────
 // Status pill used widely. fg = text color, bg = background.
-export function Pill({ children, fg = C.text, bg = "#f3f3f3", uppercase = true, weight = 700, style = {} }) {
+// `outline` swaps the tinted fill for a hairline in the same hue — quieter on
+// dense screens where a lot of pills share one card.
+export function Pill({ children, fg = C.text, bg = "#f3f3f3", uppercase = true, weight = 700, outline = false, style = {} }) {
   return (
     <span style={{
       display: "inline-flex", alignItems: "center", gap: 4,
-      fontSize: 10, fontWeight: weight, padding: "3px 10px",
-      borderRadius: 100, background: bg, color: fg,
+      fontSize: 10, fontWeight: weight,
+      padding: outline ? "2px 9px" : "3px 10px",
+      borderRadius: 100,
+      background: outline ? "transparent" : bg,
+      border: outline ? `1px solid ${fg}59` : "1px solid transparent",
+      color: fg,
       textTransform: uppercase ? "uppercase" : "none",
       letterSpacing: uppercase ? "0.5px" : "normal",
       whiteSpace: "nowrap", ...style,

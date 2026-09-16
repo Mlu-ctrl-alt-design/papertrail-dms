@@ -55,7 +55,9 @@ export function Sidebar({ navItems, active, setActive, collapsed, footer }) {
 }
 
 // ─── TopBar Icon Button (matches the brand-bar icon-button style) ─────────────
-export function TopBarIconBtn({ onClick, title, children, badge }) {
+// `accent` should match the bar the button sits on, so the notification badge
+// reads as cut out of the bar rather than stuck on top of it.
+export function TopBarIconBtn({ onClick, title, children, badge, accent = C.brand }) {
   return (
     <button onClick={onClick} title={title} style={{
       background: "transparent",
@@ -75,7 +77,7 @@ export function TopBarIconBtn({ onClick, title, children, badge }) {
           width: 16, height: 16, background: C.danger, borderRadius: "50%",
           display: "grid", placeItems: "center",
           fontSize: 9, fontWeight: 700, color: "#fff",
-          border: `2px solid ${C.brand}`,
+          border: `2px solid ${accent}`,
         }}>{badge}</div>
       )}
     </button>
