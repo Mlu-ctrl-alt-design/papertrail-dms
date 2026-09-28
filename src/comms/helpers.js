@@ -53,21 +53,8 @@ export const renderBody = (body, person) =>
     .replaceAll("{{persal}}", person?.persal || "00000000")
     .replaceAll("{{lineManager}}", person?.lineManager || "your line manager");
 
-// Minimal WhatsApp markup tokeniser: *bold* and _italic_.
-// Returns [{ text, bold, italic }] so callers can render without JSX here.
-export function waTokens(text) {
-  const out = [];
-  const re = /(\*[^*\n]+\*|_[^_\n]+_)/g;
-  let last = 0, m;
-  while ((m = re.exec(text))) {
-    if (m.index > last) out.push({ text: text.slice(last, m.index) });
-    const inner = m[0].slice(1, -1);
-    out.push(m[0][0] === "*" ? { text: inner, bold: true } : { text: inner, italic: true });
-    last = m.index + m[0].length;
-  }
-  if (last < text.length) out.push({ text: text.slice(last) });
-  return out;
-}
+// The *bold*/_italic_ tokeniser lives with the rest of the WhatsApp kit now.
+export { waTokens } from "../components/index.js";
 
 export const nowTime = () =>
   new Date().toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit", hour12: false });

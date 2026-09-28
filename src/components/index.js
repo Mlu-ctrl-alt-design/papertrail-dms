@@ -11,3 +11,7 @@ export * from "./ViewHeader.jsx";
 export * from "./DataTable.jsx";
 export * from "./AppShell.jsx";
 export * from "./responsive.jsx";
+export * from "./patterns.jsx";
+export * from "./Tabs.jsx";
+export * from "./whatsapp.jsx";
+export * from "./print.jsx";

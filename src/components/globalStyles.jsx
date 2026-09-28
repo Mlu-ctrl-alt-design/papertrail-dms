@@ -23,6 +23,21 @@ input,textarea,select{font-family:inherit;}input:focus,textarea:focus,select:foc
 .slide-left{animation:slideLeft 0.22s ease both;}
 .scale-in{animation:scaleIn 0.2s ease both;}
 .shimmer{background:linear-gradient(90deg,#f0f0f0 25%,#e8e8e8 50%,#f0f0f0 75%);background-size:400px 100%;animation:shimmer 1.4s infinite;}
+
+/* Print: the app chrome is not the report. PrintSheet portals itself to
+   <body>, i.e. a sibling of #root rather than a descendant — so the print
+   rules are two selectors that cannot fight the app's own layout. That is how
+   "Export to PDF" yields a clean document instead of a screenshot of a
+   console. */
+.print-sheet{display:none;}
+@media print{
+  html,body{height:auto;background:#fff;}
+  #root{display:none !important;}
+  .no-print{display:none !important;}
+  .print-sheet{display:block !important;}
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  @page{margin:14mm;}
+}
 `;
 
 export function GlobalStyles() {
