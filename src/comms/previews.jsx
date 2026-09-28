@@ -2,97 +2,19 @@
 // Each preview shows the recipient's view; the receipt strip underneath is the
 // operator's console readout of the delivery webhooks.
 import {
-  Document20Filled, CheckmarkCircle20Filled, ArrowDownload20Regular,
-  Warning20Filled, Mail20Filled, Alert20Filled, Chat20Filled,
+  CheckmarkCircle20Filled, Mail20Filled, Alert20Filled, Chat20Filled,
 } from "@fluentui/react-icons";
-import { I, C, SHADOW } from "../components/index.js";
-import { renderBody, waTokens, deliveryStyle, nowTime, smsSegments } from "./helpers.js";
+import {
+  I, C, SHADOW,
+  // The handset chassis, receipt ticks, markup renderer and attachment card
+  // are shared with the OPFA prototype — see components/whatsapp.jsx.
+  WA, PhoneFrame, Ticks, WaBody, AttachmentCard,
+} from "../components/index.js";
+import { renderBody, deliveryStyle, nowTime, smsSegments } from "./helpers.js";
 import { channelById } from "./data.js";
 
-const WA = {
-  header: "#075E54",
-  bubble: "#ffffff",
-  paper: "#ECE5DD",
-  meta: "#667781",
-  green: "#25D366",
-  blue: "#53BDEB",
-};
-
-// Double-tick glyph, drawn rather than composed from icons so it reads as the
-// WhatsApp receipt everyone recognises. `read` state renders it blue.
-export function Ticks({ state = "sent", size = 16 }) {
-  const st = deliveryStyle(state);
-  if (state === "failed") return <I as={Warning20Filled} size={size * 0.85} color={C.danger} />;
-  if (st.ticks === 0) return <span style={{ width: size, display: "inline-block" }} />;
-  const color = st.blue ? WA.blue : WA.meta;
-  return (
-    <svg width={size} height={size * 0.68} viewBox="0 0 18 12" fill="none"
-         style={{ display: "block", flexShrink: 0 }} aria-hidden="true">
-      <path d={st.ticks === 2 ? "M1 6.6 L4.4 10 L10.6 1.6" : "M3.5 6.6 L6.9 10 L13.1 1.6"}
-            stroke={color} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
-      {st.ticks === 2 && (
-        <path d="M7.4 10 L13.6 1.6" stroke={color} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
-      )}
-    </svg>
-  );
-}
-
-function BodyText({ text }) {
-  return (
-    <div style={{ fontSize: 13.5, lineHeight: 1.45, color: "#111b21", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-      {text.split("\n").map((line, i) => (
-        <div key={i} style={{ minHeight: line ? undefined : 8 }}>
-          {waTokens(line).map((t, j) =>
-            t.bold ? <strong key={j}>{t.text}</strong>
-            : t.italic ? <em key={j}>{t.text}</em>
-            : <span key={j}>{t.text}</span>
-          )}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function AttachmentCard({ attachment }) {
-  return (
-    <div style={{
-      display: "flex", alignItems: "center", gap: 10,
-      background: "#f5f6f6", borderRadius: 6, padding: "10px 12px", marginBottom: 6,
-    }}>
-      <div style={{ width: 34, height: 34, borderRadius: 6, background: "#fde7e9", display: "grid", placeItems: "center", flexShrink: 0 }}>
-        <I as={Document20Filled} size={18} color={C.danger} />
-      </div>
-      <div style={{ minWidth: 0, flex: 1 }}>
-        <div style={{ fontSize: 12.5, fontWeight: 600, color: "#111b21", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {attachment.name}
-        </div>
-        <div style={{ fontSize: 10.5, color: WA.meta, textTransform: "uppercase", letterSpacing: "0.3px" }}>
-          {attachment.pages ? `${attachment.pages} pages · ` : ""}{attachment.size} · {attachment.kind}
-        </div>
-      </div>
-      <I as={ArrowDownload20Regular} size={16} color={WA.meta} />
-    </div>
-  );
-}
-
-// Shared phone chassis so WhatsApp and SMS sit in the same handset.
-function PhoneFrame({ children, width, headerBg, statusTime }) {
-  return (
-    <div style={{
-      width, border: "9px solid #111b21", borderRadius: 30, overflow: "hidden",
-      boxShadow: "0 18px 46px rgba(0,0,0,0.28)", background: "#111b21",
-    }}>
-      <div style={{
-        background: headerBg, color: "rgba(255,255,255,0.9)",
-        padding: "5px 14px 2px", fontSize: 10, display: "flex", justifyContent: "space-between",
-      }}>
-        <span>{statusTime}</span>
-        <span style={{ letterSpacing: "1px" }}>▮▮▮ ⌁</span>
-      </div>
-      {children}
-    </div>
-  );
-}
+// Delivery.jsx imports Ticks from here; keep that path working.
+export { Ticks };
 
 // ─── Operator-side receipt strip (shared by every channel) ────────────────────
 function Receipt({ person, status, channel }) {
@@ -176,7 +98,7 @@ export function WhatsAppPreview({
               padding: 8, maxWidth: "92%", boxShadow: "0 1px 1px rgba(0,0,0,0.13)",
             }}>
               {attachment && <AttachmentCard attachment={attachment} />}
-              <BodyText text={text} />
+              <WaBody text={text} />
               <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 4, marginTop: 4 }}>
                 <span style={{ fontSize: 10, color: WA.meta }}>{clock}</span>
               </div>
@@ -282,7 +204,7 @@ export function EmailPreview({ person, subject, body, attachment, time, status =
         </div>
         <div style={{ padding: "14px", maxHeight: 340, overflowY: "auto" }}>
           {attachment && <AttachmentCard attachment={attachment} />}
-          <BodyText text={text} />
+          <WaBody text={text} />
         </div>
         <div style={{ padding: "10px 14px", borderTop: `1px solid ${C.hairline}`, background: C.surfaceAlt, fontSize: 10, color: C.faint, lineHeight: 1.5 }}>
           Sent by the North West Provincial Government · Provincial Communications.
@@ -333,7 +255,7 @@ export function AppPreview({ person, body, attachment, time, status = null, widt
             </div>
             <div style={{ padding: "12px", maxHeight: 250, overflowY: "auto" }}>
               {attachment && <AttachmentCard attachment={attachment} />}
-              <BodyText text={text} />
+              <WaBody text={text} />
             </div>
           </div>
         </div>

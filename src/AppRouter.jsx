@@ -7,6 +7,8 @@
 //   #/epms    → mSCOA
 //   #/payroll → Payroll
 //   #/connect → Connect (WhatsApp internal comms)
+//   #/wa      → OPFA WhatsApp complainant simulator
+//   #/opfa    → Ezra OPFA Console (the same store, the agent's side)
 //
 // A small floating switcher renders bottom-left so the prototypes are reachable
 // without remembering URLs. It collapses to a single button — it is scaffolding
@@ -18,13 +20,16 @@ import DMS from "./PaperTrailDMS.jsx";
 import EPMS from "./epms/ePMS.jsx";
 import PAYROLL from "./payroll/Payroll.jsx";
 import CONNECT from "./comms/Connect.jsx";
+import WA from "./opfa/WhatsApp.jsx";
+import OPFA from "./opfa/Console.jsx";
 
+// Exact-segment match rather than a substring chain: with six apps the chain
+// starts colliding, and when it does it fails silently by falling through to
+// the DMS.
 function readApp() {
   const h = (typeof window !== "undefined" ? window.location.hash : "") || "";
-  if (h.includes("connect")) return "connect";
-  if (h.includes("payroll")) return "payroll";
-  if (h.includes("epms")) return "epms";
-  return "dms";
+  const id = h.replace(/^#\/?/, "").split(/[/?#]/)[0].toLowerCase();
+  return APPS.some((a) => a.id === id) ? id : "dms";
 }
 
 const APPS = [
@@ -32,7 +37,12 @@ const APPS = [
   { id: "epms", label: "mSCOA", title: "Ezra mSCOA" },
   { id: "payroll", label: "Payroll", title: "Ezra360 Payroll" },
   { id: "connect", label: "Connect", title: "Xiquel Employee Comms" },
+  { id: "wa", label: "WhatsApp", title: "OPFA WhatsApp — Complainant" },
+  { id: "opfa", label: "OPFA", title: "Ezra OPFA Console" },
 ];
+
+// Six ternary arms on one line stopped reading a while ago.
+const SCREENS = { dms: DMS, epms: EPMS, payroll: PAYROLL, connect: CONNECT, wa: WA, opfa: OPFA };
 
 const STORE_KEY = "ezra360.switcher.open";
 
@@ -153,8 +163,8 @@ export default function AppRouter() {
     return () => window.removeEventListener("hashchange", onHash);
   }, []);
 
-  // The four prototypes share one bundle and therefore one index.html, so the
-  // tab title is set per app rather than baked into the document head.
+  // The prototypes share one bundle and therefore one index.html, so the tab
+  // title is set per app rather than baked into the document head.
   useEffect(() => {
     const entry = APPS.find((a) => a.id === app);
     if (entry) document.title = entry.title;
@@ -165,9 +175,11 @@ export default function AppRouter() {
     setApp(id);
   };
 
+  const Screen = SCREENS[app] || DMS;
+
   return (
     <>
-      {app === "connect" ? <CONNECT/> : app === "payroll" ? <PAYROLL/> : app === "epms" ? <EPMS/> : <DMS/>}
+      <Screen/>
       <AppSwitcher app={app} onSwitch={switchTo}/>
     </>
   );
