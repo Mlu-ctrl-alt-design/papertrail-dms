@@ -9,6 +9,7 @@
 //   #/connect → Connect (WhatsApp internal comms)
 //   #/wa      → OPFA WhatsApp complainant simulator
 //   #/opfa    → Ezra OPFA Console (the same store, the agent's side)
+//   #/finance → Ezra360 Financials (accounting engine demo)
 //
 // A small floating switcher renders bottom-left so the prototypes are reachable
 // without remembering URLs. It collapses to a single button — it is scaffolding
@@ -22,8 +23,9 @@ import PAYROLL from "./payroll/Payroll.jsx";
 import CONNECT from "./comms/Connect.jsx";
 import WA from "./opfa/WhatsApp.jsx";
 import OPFA from "./opfa/Console.jsx";
+import FINANCE from "./finance/Finance.jsx";
 
-// Exact-segment match rather than a substring chain: with six apps the chain
+// Exact-segment match rather than a substring chain: with seven apps the chain
 // starts colliding, and when it does it fails silently by falling through to
 // the DMS.
 function readApp() {
@@ -39,10 +41,11 @@ const APPS = [
   { id: "connect", label: "Connect", title: "Xiquel Employee Comms" },
   { id: "wa", label: "WhatsApp", title: "OPFA WhatsApp — Complainant" },
   { id: "opfa", label: "OPFA", title: "Ezra OPFA Console" },
+  { id: "finance", label: "Finance", title: "Ezra360 Financials" },
 ];
 
-// Six ternary arms on one line stopped reading a while ago.
-const SCREENS = { dms: DMS, epms: EPMS, payroll: PAYROLL, connect: CONNECT, wa: WA, opfa: OPFA };
+// Seven ternary arms on one line stopped reading a while ago.
+const SCREENS = { dms: DMS, epms: EPMS, payroll: PAYROLL, connect: CONNECT, wa: WA, opfa: OPFA, finance: FINANCE };
 
 const STORE_KEY = "ezra360.switcher.open";
 
