@@ -27,7 +27,8 @@ import {
 } from "./engine/reports.js";
 import { drillRows, nextLevel, rootNode } from "./engine/drill.js";
 import {
-  createAsset, createSupplierInvoice, monthEndPlan, payInvoice, previewPayment, runMonthEnd,
+  amortisationPlan, closePeriod, createAsset, createSupplierInvoice, depreciationPlan,
+  monthEndPlan, payInvoice, previewPayment, runAmortisation, runDepreciation, runMonthEnd,
 } from "./engine/actions.js";
 import { buildState } from "./seed/build.js";
 import {
@@ -452,6 +453,82 @@ ok("every journal line reaches a source document or names the module that posted
       `journal ${j.ref} has unknown source ${j.source.type}`,
     );
   }
+});
+
+section("The period-end runs, fired one at a time");
+ok("depreciation runs on its own without closing the period", () => {
+  let s = buildState();
+  const before = netProfit(s.ledger, { from: FY.start, to: "2026-10-31" });
+  const plan = depreciationPlan(s);
+  assert.ok(plan.journalCount > 0, "October should have depreciation outstanding");
+  assert.equal(plan.kind, "depreciation");
+
+  const r = runDepreciation(s);
+  s = r.state;
+  assert.equal(s.closedThrough, "2026-09", "running depreciation must not close the period");
+  assert.equal(r.journals.length, plan.journalCount, "one journal per asset");
+  eq(
+    netProfit(s.ledger, { from: FY.start, to: "2026-10-31" }),
+    before - plan.total,
+    "net profit after the depreciation run",
+  );
+  // Amortisation is untouched by it.
+  assert.equal(amortisationPlan(s).journalCount, amortisationPlan(buildState()).journalCount,
+    "the depreciation run must not post amortisation");
+  everyJournalBalances(s);
+  balanceSheetBalances(s, "2026-10-31");
+});
+ok("running depreciation twice posts nothing the second time", () => {
+  let s = runDepreciation(buildState()).state;
+  const after = s.ledger.journals.length;
+  assert.equal(depreciationPlan(s).journalCount, 0, "nothing should still be due");
+  s = runDepreciation(s).state;
+  assert.equal(s.ledger.journals.length, after, "a second run posted journals");
+});
+ok("amortisation runs on its own, in either order", () => {
+  const amoFirst = runDepreciation(runAmortisation(buildState()).state).state;
+  const depFirst = runAmortisation(runDepreciation(buildState()).state).state;
+  eq(
+    balance(amoFirst.ledger, { codes: PL_CODES, from: FY.start, to: "2026-10-31" }),
+    balance(depFirst.ledger, { codes: PL_CODES, from: FY.start, to: "2026-10-31" }),
+    "the two orders must reach the same books",
+  );
+  assert.equal(amoFirst.closedThrough, "2026-09", "neither run closes the period");
+});
+ok("a period with outstanding charges refuses to close", () => {
+  const fresh = buildState();
+  assert.throws(() => closePeriod(fresh), /cannot be closed/);
+  const half = runDepreciation(fresh).state;
+  assert.throws(() => closePeriod(half), /cannot be closed/);
+  const done = runAmortisation(half).state;
+  const closed = closePeriod(done).state;
+  assert.equal(closed.closedThrough, "2026-10", "closing after both runs");
+  assert.throws(() => closePeriod(closed, "2026-10"), /not the open period/);
+});
+ok("running the three acts one at a time lands where one click lands", () => {
+  const stepwise = closePeriod(runAmortisation(runDepreciation(buildState()).state).state).state;
+  const oneClick = runMonthEnd(buildState()).state;
+  assert.equal(stepwise.closedThrough, oneClick.closedThrough);
+  assert.equal(stepwise.ledger.journals.length, oneClick.ledger.journals.length);
+  for (const scope of SCOPES) {
+    eq(
+      balance(stepwise.ledger, { scope: scope.scope, to: "2026-10-31", codes: PL_CODES }),
+      balance(oneClick.ledger, { scope: scope.scope, to: "2026-10-31", codes: PL_CODES }),
+      `${scope.label}: stepwise vs one click`,
+    );
+  }
+});
+ok("the depreciation run moves net book value and nothing else", () => {
+  const fresh = buildState();
+  const asset = fresh.assets.find((a) => a.id === "FA-0001");
+  eq(nbv(fresh.ledger, asset, "2026-10-31"), 153_000_000, "NBV before the run");
+  const after = runDepreciation(fresh).state;
+  eq(nbv(after.ledger, asset, "2026-10-31"), 150_000_000, "NBV after the run");
+  eq(
+    remaining(after.ledger, after.deferrals.find((d) => d.id === "DEF-0001"), "2026-10-31"),
+    30_000_000,
+    "the prepayment must not move — that is the other run",
+  );
 });
 
 section("Ledger entry mapping");
