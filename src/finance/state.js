@@ -18,7 +18,11 @@ export const useFinance = () => useContext(FinanceContext);
 // The top-level AppRouter only reads the first hash segment, so everything after
 // `#/finance/` is parsed here.
 
-export const SECTIONS = ["home", "assets", "deferrals", "payables", "journals", "period-close", "reports"];
+export const SECTIONS = [
+  "home", "assets", "deferrals", "payables",
+  "ledger", "journals", "period-close", "reports",
+  "accounts", "mapping",
+];
 
 export function readRoute() {
   const hash = (typeof window !== "undefined" ? window.location.hash : "") || "";

@@ -7,7 +7,7 @@
 //
 // Pure: no React, no browser APIs. check.mjs runs this file directly.
 
-import { account, naturalSign } from "./coa.js";
+import { ACCOUNTS, account, naturalSign } from "./coa.js";
 
 export function emptyLedger() {
   return { journals: [], seq: 0 };
@@ -59,6 +59,10 @@ export function post(ledger, entry) {
     memo: entry.memo || "",
     source: entry.source || { type: "manual", id: null },
     batch: entry.batch || null,
+    // Which ledger entry mapping posted this, and which rule posted each line.
+    // Carried on the journal rather than inferred later, so the General Ledger
+    // and the drill-down can name the configuration behind any figure.
+    mappingId: entry.mappingId || null,
     lines: entry.lines.map((l) => ({
       account: l.account,
       debit: l.debit || 0,
@@ -67,6 +71,7 @@ export function post(ledger, entry) {
       branch: l.branch,
       counterparty: l.counterparty || null,
       fx: l.fx || null,
+      rule: l.rule || null,
     })),
   };
   return { seq, journals: [...ledger.journals, journal] };
@@ -85,6 +90,7 @@ export function postMany(ledger, entries) {
       memo: entry.memo || "",
       source: entry.source || { type: "manual", id: null },
       batch: entry.batch || null,
+      mappingId: entry.mappingId || null,
       lines: entry.lines.map((l) => ({
         account: l.account,
         debit: l.debit || 0,
@@ -93,6 +99,7 @@ export function postMany(ledger, entries) {
         branch: l.branch,
         counterparty: l.counterparty || null,
         fx: l.fx || null,
+        rule: l.rule || null,
       })),
     };
     added.push(journal);
@@ -125,6 +132,7 @@ export function lines(ledger) {
         memo: j.memo,
         source: j.source,
         batch: j.batch,
+        mappingId: j.mappingId,
         amount: (l.debit || 0) - (l.credit || 0),
       });
     }
@@ -221,3 +229,75 @@ export function trialBalance(ledger, opts = {}) {
       signed: v,
     }));
 }
+
+// ─── General ledger ───────────────────────────────────────────────────────────
+// Opening balance, the period's debits and credits, and the closing balance, per
+// account. Opening is simply everything up to the day before the period starts,
+// which is why opening + movement = closing can never be anything but true.
+
+export function generalLedger(ledger, { scope, from, to } = {}) {
+  const opening = new Map();
+  const debits = new Map();
+  const credits = new Map();
+  const counts = new Map();
+
+  for (const l of lines(ledger)) {
+    if (!inScope(l, scope)) continue;
+    if (to && l.date > to) continue;
+    const before = from && l.date < from;
+    if (before) {
+      opening.set(l.account, (opening.get(l.account) || 0) + l.amount);
+    } else {
+      debits.set(l.account, (debits.get(l.account) || 0) + l.debit);
+      credits.set(l.account, (credits.get(l.account) || 0) + l.credit);
+      counts.set(l.account, (counts.get(l.account) || 0) + 1);
+    }
+  }
+
+  return ACCOUNTS.map((a) => {
+    const open = opening.get(a.code) || 0;
+    const dr = debits.get(a.code) || 0;
+    const cr = credits.get(a.code) || 0;
+    return {
+      code: a.code,
+      name: a.name,
+      type: a.type,
+      group: a.group,
+      opening: open,
+      debit: dr,
+      credit: cr,
+      movement: dr - cr,
+      closing: open + dr - cr,
+      entries: counts.get(a.code) || 0,
+    };
+  });
+}
+
+// One account's ledger, oldest first, with a running balance — the listing an
+// accountant means when they say "show me the account".
+export function accountLedger(ledger, { code, scope, from, to } = {}) {
+  const opening = balance(ledger, { codes: [code], scope, to: from ? prevIso(from) : undefined });
+  const rows = query(ledger, { codes: [code], scope, from, to })
+    .slice()
+    .sort((a, b) => (a.date === b.date ? a.journalId.localeCompare(b.journalId) : a.date.localeCompare(b.date)));
+  let running = opening;
+  return {
+    opening,
+    rows: rows.map((l) => {
+      running += l.amount;
+      return { ...l, running };
+    }),
+    closing: running,
+  };
+}
+
+// Local to this file: the ledger speaks in ISO date strings and only ever needs
+// "the instant before this period".
+const prevIso = (iso) => {
+  const [y, m, d] = iso.split("-").map(Number);
+  if (d > 1) return `${y}-${String(m).padStart(2, "0")}-${String(d - 1).padStart(2, "0")}`;
+  const pm = m === 1 ? 12 : m - 1;
+  const py = m === 1 ? y - 1 : y;
+  const last = [31, (py % 4 === 0 && (py % 100 !== 0 || py % 400 === 0)) ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][pm - 1];
+  return `${py}-${String(pm).padStart(2, "0")}-${last}`;
+};

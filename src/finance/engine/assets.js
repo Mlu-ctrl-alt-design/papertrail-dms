@@ -9,6 +9,7 @@
 import { addMonths, monthEnd, monthKey, monthsBetween } from "../config.js";
 import { assetCategory } from "./coa.js";
 import { lines } from "./ledger.js";
+import { mappedEntry } from "./mapping.js";
 
 export const SOURCE_ACQUISITION = "asset-acquisition";
 export const SOURCE_DEPRECIATION = "asset-depreciation";
@@ -103,32 +104,38 @@ export const isFullyDepreciated = (ledger, asset) =>
 
 // ─── Journals ─────────────────────────────────────────────────────────────────
 
+// Both journals are built by the Fixed Assets ledger entry mappings. The three
+// accounts come off the asset category, which is exactly what the mapping's
+// Account Field column says they do.
 export function acquisitionEntry(asset) {
   const cat = assetCategory(asset.categoryId);
-  const creditAccount = asset.fundedBy === "payables" ? "2010" : "1010";
-  return {
+  return mappedEntry("FA-ACQ", {
     date: asset.inService,
     memo: `Acquisition — ${asset.name} (${asset.tag})`,
     source: { type: SOURCE_ACQUISITION, id: asset.id },
-    lines: [
-      { account: cat.costAccount, debit: asset.cost, company: asset.company, branch: asset.branch },
-      { account: creditAccount, credit: asset.cost, company: asset.company, branch: asset.branch },
-    ],
-  };
+    unit: { company: asset.company, branch: asset.branch },
+    accounts: {
+      costAccount: cat.costAccount,
+      fundingAccount: asset.fundedBy === "payables" ? "2010" : "1010",
+    },
+    amounts: { assetCost: asset.cost },
+  });
 }
 
 export function depreciationEntry(asset, period, amount) {
   const cat = assetCategory(asset.categoryId);
-  return {
+  return mappedEntry("FA-DEP", {
     date: monthEnd(period),
     memo: `Depreciation ${period} — ${asset.name} (${asset.tag})`,
     source: { type: SOURCE_DEPRECIATION, id: asset.id, period },
     batch: `DEP-${period}`,
-    lines: [
-      { account: cat.expenseAccount, debit: amount, company: asset.company, branch: asset.branch },
-      { account: cat.accumAccount, credit: amount, company: asset.company, branch: asset.branch },
-    ],
-  };
+    unit: { company: asset.company, branch: asset.branch },
+    accounts: {
+      depreciationAccount: cat.expenseAccount,
+      accumulatedAccount: cat.accumAccount,
+    },
+    amounts: { periodCharge: amount },
+  });
 }
 
 // What a month-end run would post for depreciation: one row per asset with an

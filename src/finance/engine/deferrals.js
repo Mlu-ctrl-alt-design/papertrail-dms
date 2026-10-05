@@ -7,6 +7,7 @@
 
 import { addMonths, monthEnd, monthKey, monthsBetween } from "../config.js";
 import { lines } from "./ledger.js";
+import { mappedEntry } from "./mapping.js";
 
 export const SOURCE_INVOICE = "supplier-invoice";
 export const SOURCE_AMORTISATION = "deferral-amortisation";
@@ -100,16 +101,18 @@ export const isActive = (ledger, deferral) => remaining(ledger, deferral) > 0;
 // the same code path.
 
 export function amortisationEntry(deferral, period, amount) {
-  return {
+  return mappedEntry("PRE-AMO", {
     date: monthEnd(period),
     memo: `Amortisation ${period} — ${deferral.description}`,
     source: { type: SOURCE_AMORTISATION, id: deferral.id, period },
     batch: `AMO-${period}`,
-    lines: [
-      { account: deferral.expenseAccount, debit: amount, company: deferral.company, branch: deferral.branch },
-      { account: deferral.prepaidAccount, credit: amount, company: deferral.company, branch: deferral.branch },
-    ],
-  };
+    unit: { company: deferral.company, branch: deferral.branch },
+    accounts: {
+      expenseAccount: deferral.expenseAccount,
+      prepaidAccount: deferral.prepaidAccount,
+    },
+    amounts: { periodRelease: amount },
+  });
 }
 
 export function amortisationDue(ledger, deferrals, period) {

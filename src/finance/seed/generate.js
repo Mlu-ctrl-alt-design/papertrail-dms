@@ -9,6 +9,7 @@
 import { TODAY, monthEnd, monthKey } from "../config.js";
 import { invoiceEntry, makeInvoice, paymentEntry, settlement } from "../engine/fx.js";
 import { acquisitionEntry } from "../engine/assets.js";
+import { mappedEntry } from "../engine/mapping.js";
 import { OPEN_PERIOD, SEEDED_PERIODS } from "./scripted.js";
 
 // mulberry32 — small, fast, and stable across engines, which is what makes the
@@ -103,15 +104,31 @@ export function generateBackground(seed = 20261020) {
   let invSeq = 0;
   let paySeq = 0;
 
-  const cash = (date, memo, debit, credit, amount, unit, extra = {}) =>
-    entries.push({
+  // Everything the background modules post goes through a ledger entry mapping,
+  // the same as the scripted transactions do. An accountant opening the journal
+  // should be able to ask "which rule posted this" of any line in it.
+  const posted = (mappingId, date, memo, unit, accounts, amounts, extra = {}) =>
+    entries.push(mappedEntry(mappingId, {
       date, memo,
-      source: extra.source || { type: "manual", id: null },
-      lines: [
-        { account: debit, debit: amount, company: unit.company, branch: unit.branch },
-        { account: credit, credit: amount, company: unit.company, branch: unit.branch },
-      ],
-    });
+      source: extra.source || { type: extra.sourceType || "module-posting", id: null },
+      unit, accounts, amounts,
+    }));
+
+  const sale = (date, memo, kind, revenueAccount, amount, unit) =>
+    posted(kind === "cash" ? "SAL-CASH" : "SAL-CRED", date, memo, unit,
+      { bankAccount: "1010", revenueAccount }, { saleTotal: amount }, { sourceType: "sale" });
+
+  const receipt = (date, memo, amount, unit) =>
+    posted("AR-RCT", date, memo, unit, { bankAccount: "1010" }, { receiptTotal: amount },
+      { sourceType: "customer-receipt" });
+
+  const payroll = (date, memo, amount, unit) =>
+    posted("PAY-RUN", date, memo, unit, { bankAccount: "1010" }, { payrollCost: amount },
+      { sourceType: "payroll-run" });
+
+  const cashExpense = (date, memo, expenseAccount, amount, unit) =>
+    posted("EXP-CASH", date, memo, unit, { expenseAccount, bankAccount: "1010" },
+      { expenseTotal: amount }, { sourceType: "cash-expense" });
 
   // A supplier invoice plus, a month later, its payment — so payables at any
   // date is exactly the list of invoices not yet settled.
@@ -189,8 +206,8 @@ export function generateBackground(seed = 20261020) {
       const raised = [];
 
       if (p.kind === "trade") {
-        cash(day(period, by(26)), `Till takings ${period}`, "1010", "4010", j(p.cashSales * share), unit);
-        cash(day(period, by(27)), `Function and event invoicing ${period}`, "1100", "4010", j(p.creditSales * share), unit);
+        sale(day(period, by(26)), `Till takings ${period}`, "cash", "4010", j(p.cashSales * share), unit);
+        sale(day(period, by(27)), `Function and event invoicing ${period}`, "credit", "4010", j(p.creditSales * share), unit);
         raised.push(supplierInvoice(period, unit, {
           supplier: pick(SUPPLIERS.cos), description: "Food and beverage stock",
           account: "5010", amount: j(p.cos * share), dayOfMonth: 8,
@@ -206,39 +223,33 @@ export function generateBackground(seed = 20261020) {
           }));
         }
         // Payroll runs at month end, so a part month has not paid it yet.
-        if (!partial) cash(monthEnd(period), `Payroll ${period}`, "6010", "1010", j(p.salaries), unit);
-        cash(day(period, 2), `Premises rent ${period}`, "6020", "1010", j(p.rent), unit);
-        cash(day(period, by(22)), `Customer receipts ${period}`, "1010", "1100", j(p.receipts * share), unit);
+        if (!partial) payroll(monthEnd(period), `Payroll ${period}`, j(p.salaries), unit);
+        cashExpense(day(period, 2), `Premises rent ${period}`, "6020", j(p.rent), unit);
+        receipt(day(period, by(22)), `Customer receipts ${period}`, j(p.receipts * share), unit);
       }
 
       if (p.kind === "rental") {
-        cash(day(period, 3), `Rent collected ${period}`, "1010", "4020", j(p.cashRent), unit);
-        cash(day(period, 3), `Rent invoiced ${period}`, "1100", "4020", j(p.creditRent), unit);
+        sale(day(period, 3), `Rent collected ${period}`, "cash", "4020", j(p.cashRent), unit);
+        sale(day(period, 3), `Rent invoiced ${period}`, "credit", "4020", j(p.creditRent), unit);
         raised.push(supplierInvoice(period, unit, {
           supplier: pick(SUPPLIERS.utilities), description: `Common area utilities ${period}`,
           account: "6030", amount: j(p.utilities), dayOfMonth: 18,
         }));
-        if (!partial) cash(monthEnd(period), `Payroll ${period}`, "6010", "1010", j(p.salaries), unit);
-        cash(day(period, by(24)), `Tenant receipts ${period}`, "1010", "1100", j(p.receipts * share), unit);
+        if (!partial) payroll(monthEnd(period), `Payroll ${period}`, j(p.salaries), unit);
+        receipt(day(period, by(24)), `Tenant receipts ${period}`, j(p.receipts * share), unit);
         if (p.loan && !partial) {
           const principal = p.loan.principal;
           const interest = j(p.loan.interest);
-          entries.push({
-            date: monthEnd(period),
-            memo: `Term loan instalment ${period}`,
-            source: { type: "manual", id: null },
-            lines: [
-              { account: "2100", debit: principal, company: p.company, branch: p.branch },
-              { account: "6090", debit: interest, company: p.company, branch: p.branch },
-              { account: "1010", credit: principal + interest, company: p.company, branch: p.branch },
-            ],
-          });
+          posted("TRE-LOAN", monthEnd(period), `Term loan instalment ${period}`, unit,
+            { bankAccount: "1010" },
+            { principal, interest, instalmentTotal: principal + interest },
+            { sourceType: "loan-instalment" });
         }
       }
 
       if (p.kind === "admin") {
-        if (!partial) cash(monthEnd(period), `Payroll ${period}`, "6010", "1010", j(p.salaries), unit);
-        cash(day(period, 2), `Head office rent ${period}`, "6020", "1010", j(p.rent), unit);
+        if (!partial) payroll(monthEnd(period), `Payroll ${period}`, j(p.salaries), unit);
+        cashExpense(day(period, 2), `Head office rent ${period}`, "6020", j(p.rent), unit);
         raised.push(supplierInvoice(period, unit, {
           supplier: pick(SUPPLIERS.utilities), description: `Head office utilities ${period}`,
           account: "6030", amount: j(p.utilities), dayOfMonth: 16,

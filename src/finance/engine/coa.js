@@ -20,9 +20,9 @@ export const ACCOUNTS = [
   { code: "1500", name: "Motor Vehicles – Cost", type: "asset", cf: "investing", group: "ppe-cost" },
   { code: "1510", name: "Plant & Equipment – Cost", type: "asset", cf: "investing", group: "ppe-cost" },
   { code: "1520", name: "Furniture & Fittings – Cost", type: "asset", cf: "investing", group: "ppe-cost" },
-  { code: "1550", name: "Accumulated Depreciation – Motor Vehicles", type: "asset", cf: "operating", group: "ppe-accum", addBack: true },
-  { code: "1560", name: "Accumulated Depreciation – Plant & Equipment", type: "asset", cf: "operating", group: "ppe-accum", addBack: true },
-  { code: "1570", name: "Accumulated Depreciation – Furniture & Fittings", type: "asset", cf: "operating", group: "ppe-accum", addBack: true },
+  { code: "1550", name: "Accumulated Depreciation – Motor Vehicles", type: "asset", cf: "operating", group: "ppe-accum", addBack: true, contra: true },
+  { code: "1560", name: "Accumulated Depreciation – Plant & Equipment", type: "asset", cf: "operating", group: "ppe-accum", addBack: true, contra: true },
+  { code: "1570", name: "Accumulated Depreciation – Furniture & Fittings", type: "asset", cf: "operating", group: "ppe-accum", addBack: true, contra: true },
   { code: "1900", name: "Intercompany Receivable", type: "asset", cf: "operating", group: "intercompany", intercompany: true },
 
   // ── Liabilities ───────────────────────────────────────────────────────────
@@ -73,6 +73,19 @@ export const naturalSign = (code) => {
   const t = BY_CODE.get(code)?.type;
   return t === "asset" || t === "expense" || t === "cos" ? 1 : -1;
 };
+
+// Which side an account normally carries its balance on. Accumulated
+// depreciation is an asset account that sits on the credit side — flagging it
+// as contra keeps the chart of accounts honest about that instead of showing a
+// negative asset and leaving the reader to work it out.
+export const normalSide = (code) => {
+  const a = BY_CODE.get(code);
+  if (!a) return "Debit";
+  if (a.contra) return naturalSign(code) === 1 ? "Credit" : "Debit";
+  return naturalSign(code) === 1 ? "Debit" : "Credit";
+};
+
+export const isContra = (code) => !!BY_CODE.get(code)?.contra;
 
 export const PL_CODES = codesOfType("income", "cos", "expense");
 export const BS_CODES = codesOfType("asset", "liability", "equity");

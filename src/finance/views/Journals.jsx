@@ -11,6 +11,7 @@ import {
 } from "../../components/index.js";
 import { branchName, companyShort, monthLabel, money, prettyDate, scopeLabel } from "../config.js";
 import { inScope } from "../engine/ledger.js";
+import { mappingName } from "../engine/mapping.js";
 import { useFinance } from "../state.js";
 import { JournalEntry, Num, Row, SubHead } from "../ui.jsx";
 import { SourceDoc } from "./Drill.jsx";
@@ -23,6 +24,12 @@ const SOURCE_LABELS = {
   "invoice-payment": "Payment",
   "deferral-amortisation": "Amortisation",
   "intercompany-charge": "Intercompany",
+  sale: "Sale",
+  "customer-receipt": "Receipt",
+  "payroll-run": "Payroll",
+  "cash-expense": "Expense",
+  "loan-instalment": "Loan",
+  "module-posting": "Module posting",
   manual: "Manual",
 };
 
@@ -46,7 +53,8 @@ export function JournalsView() {
           journal: j,
           amount: relevant.reduce((a, l) => a + l.debit, 0),
           units: [...new Set(relevant.map((l) => `${companyShort(l.company)} · ${branchName(l.company, l.branch)}`))],
-          source: SOURCE_LABELS[j.source?.type] || "Manual",
+          source: SOURCE_LABELS[j.source?.type] || "Module posting",
+          mapping: j.mappingId ? mappingName(j.mappingId) : "—",
         };
       })
       .sort((a, b) => b.journal.date.localeCompare(a.journal.date) || b.journal.id.localeCompare(a.journal.id)),
@@ -75,6 +83,11 @@ export function JournalsView() {
         <span style={{ fontSize: 11.5, color: C.muted, whiteSpace: "nowrap" }}>{r.units.join(", ")}</span>
       ),
     },
+    {
+      id: "mapping", label: "Posted by", filterable: true, minWidth: 220,
+      get: (r) => r.mapping,
+      renderCell: (r) => <span style={{ fontSize: 11.5, color: C.muted }}>{r.mapping}</span>,
+    },
     { id: "lines", label: "Lines", align: "right", get: (r) => r.journal.lines.length },
     { id: "amount", label: "Debit", align: "right", get: (r) => r.amount, renderCell: (r) => <Num value={r.amount} /> },
   ];
@@ -93,8 +106,8 @@ export function JournalsView() {
                 icon={<I as={DocumentBulletList20Regular} size={14} color={C.muted} />} basis={170} />
           <Stat label="Total debits" value={money(total)}
                 sub="Credits are identical — every entry balances within its own company and branch" basis={250} />
-          <Stat label="Posted by the system" value={String(automatic)}
-                sub="Depreciation and amortisation journals, from the month-end runs" basis={210} />
+          <Stat label="Posted by the month-end runs" value={String(automatic)}
+                sub="Depreciation and amortisation journals nobody raised" basis={230} />
           <Stat label="Open period" value={monthLabel(store.openPeriod)} basis={160} />
         </Row>
       </div>
@@ -108,7 +121,7 @@ export function JournalsView() {
             columns={columns}
             getKey={(r) => r.journal.id}
             searchPlaceholder="Search reference, narration, source…"
-            searchKeys={["ref", "memo", "source", "unit"]}
+            searchKeys={["ref", "memo", "source", "unit", "mapping"]}
             defaultSort={{ col: "date", dir: "desc" }}
             defaultPageSize={25}
             pageSizeOptions={[25, 50, 100]}

@@ -1,7 +1,7 @@
 # Demo script: Ezra360 Financials for HUGAMARA
 
 **Audience:** Vince Ssemyalo (HUGAMARA) and the thread.
-**Length:** 25–30 minutes.
+**Length:** 25–30 minutes, plus an optional 6-minute "under the bonnet" scene.
 **Anyone can present this.** It is written click by click, with the line to say and the
 number that should be on screen at each step.
 
@@ -311,6 +311,99 @@ journal and the dollar invoice you settled in scene 3.
 
 ---
 
+## Scene 6b — Under the bonnet · optional · 6 min
+
+Run this when the audience includes anyone who will have to configure or audit the
+system, or whenever someone asks "but where does it decide what to debit?". It is the
+answer to the question an accountant asks after the first six scenes.
+
+### Chart of accounts · `#/finance/accounts`
+
+**Do:** Click **Chart of Accounts** under Setup.
+
+**Say:**
+> Thirty-one accounts. Each one carries its type, the side it normally sits on, and where
+> it belongs on the cash flow statement — which is why the cash flow is derived rather
+> than drawn by hand.
+
+**Point at** account 1550, Accumulated Depreciation: an asset account whose normal
+balance is **Credit · contra**, carrying a credit balance.
+
+**Do:** Open the **Account types** tab.
+
+**Say:**
+> Six types. Three of them are carried forward every year and three are reset. That one
+> rule is the difference between the balance sheet and the income statement, and it is
+> configuration rather than code.
+
+### Ledger mapping · `#/finance/mapping`
+
+**Do:** Click **Ledger Mapping**.
+
+**On screen:** 15 ledger entry mappings, each with its module, entity and condition, and
+a count of the journals it has actually posted — **453**, which is every journal in the
+ledger.
+
+**Say:**
+> Nothing in this system decides on its own what to debit and what to credit. Every
+> journal you have seen this morning was posted by one of these rules.
+
+**Do:** Open **Accounts Payable | Payment | Transaction Ledger**.
+
+**Point at the Summary** — Module, Post To, Entity, Transaction Type, Condition and the
+Ezra QL — then at the **GL Mapping Rule** grid:
+
+| Name | Entry Type | Account Field Id | Data Field |
+|---|---|---|---|
+| Debit Payable | Debit | `payablesAccount` | `payablesRelief` |
+| Realised Exchange Difference | Debit / Credit | `fxAccount` | `fxDifference` |
+| Credit Bank | Credit | `bankAccount` | `cashPaid` |
+
+**Say:**
+> This is the payment you watched me post. Three lines. The middle one is signed — it
+> posts as a debit when the difference is a loss, as a credit when it is a gain, and
+> disappears altogether when there is no difference. One rule, all three outcomes.
+
+**Do, the one worth the trip:** go **Back to mappings** and open **Accounts Payable |
+Invoice**, then **Accounts Payable | Deferred Invoice**.
+
+**Say:**
+> Same document. Same two-line grid. The only difference between them is the condition —
+> `IsDeferred` — and whether the debit resolves to an expense account or a prepaid
+> account. That one line of configuration is the whole of your second request.
+
+### General ledger · `#/finance/ledger`
+
+**Do:** Click **General Ledger**.
+
+**On screen:** every account with its opening balance, the period's debits and credits
+and its closing balance. Debits and credits for the period are equal.
+
+**Do:** Click **1200 · Prepaid Insurance**.
+
+**On screen:** opening nil, a debit of **120,000,000** on 2 January from the deferred
+invoice, then nine credits of **10,000,000**, running down to **30,000,000** — and
+against every line, the rule that posted it.
+
+**Say:**
+> This is the account an auditor would ask for, and the amortisation story told in one
+> column. Each line names the rule that posted it, so you can go from a balance to the
+> configuration and back.
+
+**Do:** Click any **JNL-** reference.
+
+**On screen:** the mapping, the two rule names, the journal entry and the source document
+with a link to the deferral.
+
+**Do:** Open the **Trial balance** tab.
+
+**On screen:** total debits, total credits, **Difference: Nil**.
+
+**Say:**
+> And it proves itself. Every scope, every date.
+
+---
+
 ## Scene 7 — Close · `#/finance` · 1 min
 
 **Do:** Click **Home**.
@@ -350,6 +443,9 @@ If any of these is different, stop and reset.
 | Full at 3,650 | Cash 36,500,000 · **FX gain 500,000** |
 | Management fee, consolidated | Holdings 135,000,000 · Eliminations (135,000,000) · **Group nil** |
 | Balance sheet, any scope | **Balanced** |
+| Ledger mapping | 15 mappings · **453** journals posted from them |
+| General ledger, any scope and date | Debits = credits · trial balance difference **Nil** |
+| Prepaid Insurance ledger, at 31 Oct opening | Dr 120,000,000 · Cr 90,000,000 · balance **30,000,000** |
 
 ---
 
@@ -365,8 +461,14 @@ balances is the next step and uses the same rate table.
 **"Where is VAT?"** Deliberately left out of this dataset so that every worked number
 above is clean. It is not a limitation of the engine.
 
-**"Can I export it?"** Print / PDF on the statements renders the real report through the
-browser's print pipeline, so you choose the filename. Excel export is not in this build.
+**"Can I export it?"** Print / PDF on the statements and on the general ledger renders the
+real report through the browser's print pipeline, so you choose the filename. Excel export
+is not in this build.
+
+**"Can we change what an invoice posts to?"** That is the Ledger Mapping screen. In this
+build the rules are read-only on screen, but they are the live configuration — the engine
+builds every journal from them, and the integrity script asserts that what landed in the
+ledger is what the rule asked for. Editing them in the UI is the next step, not a rewrite.
 
 **"Does it handle more than three companies?"** The group structure is configuration.
 Consolidation is the same statement specification run once per company.

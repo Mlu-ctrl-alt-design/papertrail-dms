@@ -9,6 +9,11 @@ import { useMaxWidth, BP } from "./responsive.jsx";
 
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
 // nav items: { id, label, icon (ReactNode), badge?: number }
+//
+// An item of the shape { section: "Label" } is a group heading rather than a
+// destination. Apps with more than about seven screens need them — the finance
+// module's nav reads as four groups rather than ten peers — and when the rail is
+// collapsed the heading becomes a hairline so the grouping survives.
 export function Sidebar({ navItems, active, setActive, collapsed, footer }) {
   return (
     <div style={{
@@ -18,10 +23,20 @@ export function Sidebar({ navItems, active, setActive, collapsed, footer }) {
       borderRight: "1px solid rgba(0,0,0,0.08)",
       display: "flex", flexDirection: "column",
       transition: "width 0.25s ease", flexShrink: 0,
-      height: "100%", overflow: "hidden",
+      height: "100%", overflow: "auto",
     }}>
       <nav style={{ flex: 1, padding: "10px 0" }}>
-        {navItems.map(item => (
+        {navItems.map((item, i) => (item.section ? (
+          collapsed ? (
+            <div key={`sec-${i}`} style={{ height: 1, background: "rgba(0,0,0,0.08)", margin: "8px 12px" }} />
+          ) : (
+            <div key={`sec-${i}`} style={{
+              padding: "12px 17px 4px", fontSize: 9.5, fontWeight: 700,
+              color: C.faint, textTransform: "uppercase", letterSpacing: "0.7px",
+              whiteSpace: "nowrap",
+            }}>{item.section}</div>
+          )
+        ) : (
           <div key={item.id} onClick={() => setActive(item.id)} style={{
             display: "flex", alignItems: "center", gap: 8,
             padding: collapsed ? "9px 14px" : "9px 12px",
@@ -43,7 +58,7 @@ export function Sidebar({ navItems, active, setActive, collapsed, footer }) {
               }}/>
             )}
           </div>
-        ))}
+        )))}
       </nav>
       {footer && (
         <div style={{ padding: collapsed ? "10px" : "10px 12px", borderTop: "1px solid rgba(0,0,0,0.06)" }}>

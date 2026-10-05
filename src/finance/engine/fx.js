@@ -6,9 +6,10 @@
 // the difference is a realised exchange gain or loss. That difference is the
 // whole of request 5.
 
-import { MINOR, toBase } from "../config.js";
+import { BASE_CURRENCY, MINOR, toBase } from "../config.js";
 import { account } from "./coa.js";
 import { lines } from "./ledger.js";
+import { mappedEntry } from "./mapping.js";
 
 export const SOURCE_FX_INVOICE = "supplier-invoice";
 export const SOURCE_PAYMENT = "invoice-payment";
@@ -93,72 +94,65 @@ export function settlement({ invoice, payForeign, payRate, bankAccount }) {
   };
 }
 
+// The three-line mapping in AP-PAY does the work: payables relieved at the
+// invoice rate, cash out at the payment rate, and a signed exchange difference
+// that becomes a debit or a credit depending on which way the rate moved — and
+// drops out entirely when there is no difference to post.
 export function paymentEntry(invoice, payment, calc) {
-  const fxTag = { currency: invoice.currency, amount: calc.payForeign, rate: invoice.rate };
-  const out = [
-    {
-      account: "2010",
-      debit: calc.relief,
-      company: invoice.company,
-      branch: invoice.branch,
-      fx: fxTag,
-    },
-  ];
-  if (calc.diff > 0) {
-    out.push({ account: FX_GAIN_LOSS, debit: calc.diff, company: invoice.company, branch: invoice.branch });
-  } else if (calc.diff < 0) {
-    out.push({ account: FX_GAIN_LOSS, credit: -calc.diff, company: invoice.company, branch: invoice.branch });
-  }
-  out.push({
-    account: calc.bankAccount,
-    credit: calc.baseOut,
-    company: invoice.company,
-    branch: invoice.branch,
-    fx: calc.bankCurrency === "UGX" ? null : { currency: calc.bankCurrency, amount: calc.payForeign, rate: calc.payRate },
-  });
-  return {
+  return mappedEntry("AP-PAY", {
     date: payment.date,
     memo: `Payment ${payment.ref} — ${invoice.supplier} ${invoice.ref}`,
     source: { type: SOURCE_PAYMENT, id: payment.id, invoiceId: invoice.id },
-    lines: out,
-  };
+    unit: { company: invoice.company, branch: invoice.branch },
+    accounts: {
+      payablesAccount: "2010",
+      fxAccount: FX_GAIN_LOSS,
+      bankAccount: calc.bankAccount,
+    },
+    amounts: {
+      payablesRelief: calc.relief,
+      fxDifference: calc.diff,
+      cashPaid: calc.baseOut,
+    },
+    fxByRule: {
+      "Debit Payable": { currency: invoice.currency, amount: calc.payForeign, rate: invoice.rate },
+      ...(calc.bankCurrency === BASE_CURRENCY
+        ? {}
+        : { "Credit Bank": { currency: calc.bankCurrency, amount: calc.payForeign, rate: calc.payRate } }),
+    },
+  });
 }
 
 // A supplier invoice, foreign or base currency. The expense (or prepaid) side
 // and the payables side both carry the foreign tag so the drill-down can show
 // what was actually invoiced.
+// One document, two mappings, chosen by a condition: a deferred invoice debits
+// its prepaid account and an ordinary one debits an expense. Nothing else about
+// the two postings differs.
 export function invoiceEntry(invoice) {
-  const fxTag = invoice.currency === "UGX"
+  const deferred = !!invoice.deferralId;
+  const fxTag = invoice.currency === BASE_CURRENCY
     ? null
     : { currency: invoice.currency, amount: invoice.fxAmount, rate: invoice.rate };
-  return {
+  return mappedEntry(deferred ? "AP-INV-DEF" : "AP-INV-STD", {
     date: invoice.invoiceDate,
     memo: `${invoice.supplier} — ${invoice.description}`,
     source: { type: SOURCE_FX_INVOICE, id: invoice.id },
-    lines: [
-      {
-        account: invoice.expenseAccount,
-        debit: invoice.baseAmount,
-        company: invoice.company,
-        branch: invoice.branch,
-        fx: fxTag,
-      },
-      {
-        account: "2010",
-        credit: invoice.baseAmount,
-        company: invoice.company,
-        branch: invoice.branch,
-        fx: fxTag,
-      },
-    ],
-  };
+    unit: { company: invoice.company, branch: invoice.branch },
+    accounts: {
+      [deferred ? "prepaidAccount" : "expenseAccount"]: invoice.expenseAccount,
+      payablesAccount: "2010",
+    },
+    amounts: { invoiceTotal: invoice.baseAmount },
+    fx: fxTag,
+  });
 }
 
 // Helper for building invoice records: base amount always derives from the
 // foreign amount and the invoice-date rate.
 export function makeInvoice(fields) {
-  const currency = fields.currency || "UGX";
-  const rate = currency === "UGX" ? 1 : fields.rate;
+  const currency = fields.currency || BASE_CURRENCY;
+  const rate = currency === BASE_CURRENCY ? 1 : fields.rate;
   const fxAmount = fields.fxAmount != null
     ? fields.fxAmount
     : fields.baseAmount * 10 ** (MINOR[currency] ?? 0);

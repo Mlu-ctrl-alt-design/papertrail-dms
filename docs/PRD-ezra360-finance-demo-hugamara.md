@@ -427,3 +427,83 @@ M1 must merge first and its ledger API should be agreed before M2–M5 start, si
 | Expenses | Salaries; Rent; Utilities; Kitchen Supplies; Medical Insurance; Software Licences; Depreciation; Management Fees; Interest; Realised FX Gain/Loss |
 
 Each account carries its cash-flow classification (operating, investing, financing) so the cash flow statement is derived, not hand-built.
+---
+
+## Addendum — Chart of accounts, ledger mapping and the general ledger
+
+Added 5 October 2026, after the first build, at Mlu's request and against two screenshots
+of the real Ezra360 ERP's **Ledger Entry Mapping** record (`erp.dev.ezra360.com` →
+General Ledger → Ledger Mapping).
+
+### Why
+
+Sections 6.1–6.9 covered the five things the client asked for, but not the layer
+underneath them: the accounts themselves, the configuration that decides what a
+transaction debits and credits, and the general ledger an accountant will ask to see. The
+demo answered "can it do this" without answering "how would we set it up" or "show me the
+account".
+
+### A1. Ledger mapping — P0
+
+The ERP record has a Summary (Name, Module, Post To, Entity / Transaction Type,
+Transaction Type, Sale Type, Condition, Ezra QL Condition) and a **GL Mapping Rule** grid
+(Name, MappingLocationId, Entry Type, Account Id, Related Entity, Account Field Id, Data
+Field). `src/finance/engine/mapping.js` carries that shape.
+
+**This is configuration, not a screen that looks like configuration.** Every journal in
+the module is built by `applyMapping()` from these rules: an account is either a fixed
+Account Id or an **Account Field Id** resolved off the document at posting time, and the
+amount is a **Data Field**. Each posted line records the rule that posted it, and the
+journal records the mapping.
+
+Three behaviours the grid has to carry, all of them already needed by the demo:
+
+- **A condition that selects between two mappings.** `AP-INV-STD` and `AP-INV-DEF` are the
+  same document and the same grid shape; `IsDeferred` and one account field are the whole
+  difference between an expense and a prepayment.
+- **A signed rule.** The realised exchange difference posts as a debit when the amount is
+  positive, as a credit when it is negative, and is omitted when it is nil — one rule
+  covering a loss, a gain and no difference.
+- **An open-ended mapping.** Opening balances take their lines from the opening trial
+  balance rather than from a fixed pair, so `GL-OPEN` has no grid.
+
+*Accept:* every journal in the ledger names the mapping that posted it; every line names a
+rule that exists in that mapping; and the account and the side in the ledger are the
+account and the side the rule asked for. Asserted in `check.mjs`, not inspected by eye.
+
+### A2. Chart of accounts — P0
+
+The account masterfile: code, name, type, the side the account normally carries, its
+cash-flow classification, the number of postings and the balance, shown as a magnitude
+with Dr or Cr the way a trial balance shows it. Accumulated depreciation is flagged
+`contra` so it reads as a credit on an asset account rather than as a negative asset. An
+Account types tab says what each type means for the statements and which are carried
+forward. Clicking an account opens its general ledger.
+
+### A3. General ledger — P0
+
+Opening balance, the period's debits and credits, and the closing balance per account, for
+any scope and period; the trial balance with a live difference; and any account opened out
+into its own listing with a running balance, the rule that posted each line, and a drawer
+holding the mapping, the journal and the source document.
+
+Opening balance is everything posted before the period start, computed on demand. There is
+no roll-forward step for opening and closing to drift apart in.
+
+*Accept:* opening + movement = closing for every account and every scope; the trial balance
+nets to nil and its debits equal its credits; and the ledger agrees with the statements
+account by account.
+
+### A4. Navigation
+
+Ten screens no longer read as ten peers, so `Sidebar` in `src/components/AppShell.jsx`
+gained optional group headings — an item of the shape `{ section: "Label" }`. The finance
+nav now reads **Transactions · General ledger · Reporting · Setup**. Backwards compatible;
+no other app changed.
+
+### Not done
+
+The mapping rules are read-only on screen. They are the live configuration and editing them
+would change the books, but a rule editor is a larger piece of work than this demo needs —
+and a presenter editing GL configuration live in front of a client is not a demo anyone
+wants to give.

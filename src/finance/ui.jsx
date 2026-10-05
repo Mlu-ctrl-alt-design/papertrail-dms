@@ -13,6 +13,7 @@ import {
   fmtBase, fmtForeign, fmtRate, monthLabel, prettyDate, scopeLabel,
 } from "./config.js";
 import { accountName } from "./engine/coa.js";
+import { mappingName } from "./engine/mapping.js";
 import { NUM, linkBtn } from "./styles.js";
 
 const AMOUNT_WIDTH = 132;
@@ -319,9 +320,13 @@ const td = { padding: "5px 8px", fontSize: 12.5, borderBottom: `1px solid ${C.su
 
 // ─── Journal entry ────────────────────────────────────────────────────────────
 
-export function JournalEntry({ journal, dense = false }) {
+export function JournalEntry({ journal, dense = false, hideMapping = false }) {
   const dr = journal.lines.reduce((a, l) => a + l.debit, 0);
   const cr = journal.lines.reduce((a, l) => a + l.credit, 0);
+  // Every line knows the GL mapping rule that posted it. Showing it here means
+  // the configuration is visible wherever a journal is — the journal list, the
+  // drill-down, an asset's history — rather than only on the setup screen.
+  const showRules = journal.lines.some((l) => l.rule);
   return (
     <div>
       {!dense && (
@@ -330,10 +335,16 @@ export function JournalEntry({ journal, dense = false }) {
           <KeyValue label="Date" width={50}>{prettyDate(journal.date)}</KeyValue>
         </div>
       )}
+      {journal.mappingId && !hideMapping && (
+        <div style={{ fontSize: 11, color: C.muted, marginBottom: 8 }}>
+          Posted by <strong style={{ color: C.ink }}>{mappingName(journal.mappingId)}</strong>
+        </div>
+      )}
       <table style={{ width: "100%", borderCollapse: "collapse" }}>
         <thead>
           <tr>
             <th style={thLeft}>Account</th>
+            {showRules && <th style={thLeft}>Posted by rule</th>}
             <th style={thLeft}>Company · branch</th>
             <th style={thRight}>Debit</th>
             <th style={thRight}>Credit</th>
@@ -350,6 +361,13 @@ export function JournalEntry({ journal, dense = false }) {
                   </div>
                 )}
               </td>
+              {showRules && (
+                <td style={{ ...td, fontSize: 11.5 }}>
+                  {l.rule
+                    ? <span style={{ color: C.brand, fontWeight: 600 }}>{l.rule}</span>
+                    : <span style={{ color: C.faint }}>—</span>}
+                </td>
+              )}
               <td style={{ ...td, color: C.muted, fontSize: 11.5 }}>
                 {companyName(l.company).replace("Hugamara ", "")} · {branchName(l.company, l.branch)}
                 {l.counterparty && (
@@ -361,7 +379,7 @@ export function JournalEntry({ journal, dense = false }) {
             </tr>
           ))}
           <tr>
-            <td style={{ ...td, borderTop: `1px solid ${C.ink}`, fontWeight: 700 }} colSpan={2}>
+            <td style={{ ...td, borderTop: `1px solid ${C.ink}`, fontWeight: 700 }} colSpan={showRules ? 3 : 2}>
               {dr === cr ? "Balanced" : "OUT OF BALANCE"}
             </td>
             <td style={{ ...td, borderTop: `1px solid ${C.ink}`, textAlign: "right" }}><Num value={dr} weight={700} /></td>

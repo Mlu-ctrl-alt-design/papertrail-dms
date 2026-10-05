@@ -11,10 +11,13 @@
 import assert from "node:assert/strict";
 
 import {
-  ALL_BRANCHES, COMPANIES, FY, fmtBase, monthEnd,
+  ALL_BRANCHES, BASE_CURRENCY, COMPANIES, FY, fmtBase, monthEnd,
 } from "./config.js";
-import { BS_CODES, CASH_CODES, PL_CODES, PREPAID_CODES, PPE_ACCUM_CODES, PPE_COST_CODES } from "./engine/coa.js";
-import { balance, lines, validate } from "./engine/ledger.js";
+import {
+  ACCOUNTS, BS_CODES, CASH_CODES, PL_CODES, PREPAID_CODES, PPE_ACCUM_CODES, PPE_COST_CODES, account,
+} from "./engine/coa.js";
+import { balance, lines, trialBalance, validate } from "./engine/ledger.js";
+import { LEDGER_MAPPINGS, mapping } from "./engine/mapping.js";
 import { accumulated, nbv, schedule as assetSchedule } from "./engine/assets.js";
 import { recognised, remaining, schedule as deferralSchedule } from "./engine/deferrals.js";
 import { outstandingForeign, settlement } from "./engine/fx.js";
@@ -24,7 +27,7 @@ import {
 } from "./engine/reports.js";
 import { drillRows, nextLevel, rootNode } from "./engine/drill.js";
 import {
-  createAsset, createSupplierInvoice, monthEndPlan, payInvoice, runMonthEnd,
+  createAsset, createSupplierInvoice, monthEndPlan, payInvoice, previewPayment, runMonthEnd,
 } from "./engine/actions.js";
 import { buildState } from "./seed/build.js";
 import {
@@ -434,14 +437,127 @@ ok("Realised FX Loss reaches the invoice payment in four clicks", () => {
   // company → branch → ledger line → journal with the source document on it.
   assert.ok(path.length + 1 <= 4, "more than four clicks to the source document");
 });
-ok("every journal line reaches a source document or is plainly a manual journal", () => {
-  const KNOWN = new Set([
-    "opening-balance", "asset-acquisition", "asset-depreciation", "supplier-invoice",
-    "invoice-payment", "deferral-amortisation", "intercompany-charge", "manual",
+ok("every journal line reaches a source document or names the module that posted it", () => {
+  const DOCUMENTS = new Set([
+    "asset-acquisition", "asset-depreciation", "supplier-invoice",
+    "invoice-payment", "deferral-amortisation",
+  ]);
+  const MODULE_POSTINGS = new Set([
+    "opening-balance", "intercompany-charge", "sale", "customer-receipt",
+    "payroll-run", "cash-expense", "loan-instalment", "module-posting", "manual",
   ]);
   for (const j of state.ledger.journals) {
-    assert.ok(KNOWN.has(j.source.type), `journal ${j.ref} has unknown source ${j.source.type}`);
+    assert.ok(
+      DOCUMENTS.has(j.source.type) || MODULE_POSTINGS.has(j.source.type),
+      `journal ${j.ref} has unknown source ${j.source.type}`,
+    );
   }
+});
+
+section("Ledger entry mapping");
+ok(`${LEDGER_MAPPINGS.length} mappings, every rule resolvable`, () => {
+  const ids = new Set();
+  for (const m of LEDGER_MAPPINGS) {
+    assert.ok(!ids.has(m.id), `duplicate mapping id ${m.id}`);
+    ids.add(m.id);
+    assert.ok(m.module && m.entity && m.postTo && m.condition, `${m.id} is missing header fields`);
+    assert.ok(m.openEnded || m.rules.length >= 2, `${m.id} has fewer than two rules`);
+    for (const r of m.rules) {
+      assert.ok(r.account || r.accountField, `${m.id} rule "${r.name}" has neither an account nor an account field`);
+      if (r.account) assert.ok(account(r.account), `${m.id} rule "${r.name}" names unknown account ${r.account}`);
+      assert.ok(r.dataField, `${m.id} rule "${r.name}" has no data field`);
+      assert.ok(["Debit", "Credit"].includes(r.entryType), `${m.id} rule "${r.name}" has no entry type`);
+    }
+    // A mapping with a fixed grid must be capable of balancing: at least one
+    // debit rule and one credit rule.
+    if (!m.openEnded) {
+      assert.ok(m.rules.some((r) => r.entryType === "Debit"), `${m.id} has no debit rule`);
+      assert.ok(m.rules.some((r) => r.entryType === "Credit" || r.signed), `${m.id} has no credit rule`);
+    }
+  }
+});
+ok("every posted journal names the mapping that posted it", () => {
+  for (const j of state.ledger.journals) {
+    assert.ok(j.mappingId, `journal ${j.ref} (${j.memo}) has no ledger entry mapping`);
+    assert.ok(mapping(j.mappingId), `journal ${j.ref} names unknown mapping ${j.mappingId}`);
+  }
+});
+ok("every posted line names a rule that exists in its mapping", () => {
+  for (const j of state.ledger.journals) {
+    const m = mapping(j.mappingId);
+    if (m.openEnded) continue;
+    const names = new Set(m.rules.map((r) => r.name));
+    for (const l of j.lines) {
+      assert.ok(l.rule, `journal ${j.ref} has a line with no rule`);
+      assert.ok(names.has(l.rule), `journal ${j.ref}: rule "${l.rule}" is not in mapping ${m.id}`);
+    }
+  }
+});
+ok("a line's account is the one its rule asks for", () => {
+  for (const j of state.ledger.journals) {
+    const m = mapping(j.mappingId);
+    if (m.openEnded) continue;
+    for (const l of j.lines) {
+      const r = m.rules.find((x) => x.name === l.rule);
+      if (r.account) {
+        assert.equal(l.account, r.account, `journal ${j.ref}: rule "${r.name}" posted to ${l.account}, not ${r.account}`);
+      }
+      const side = l.debit ? "Debit" : "Credit";
+      if (!r.signed) {
+        assert.equal(side, r.entryType, `journal ${j.ref}: rule "${r.name}" posted a ${side}, not a ${r.entryType}`);
+      }
+    }
+  }
+});
+ok("the deferral flag is what selects between the two invoice mappings", () => {
+  for (const invoice of state.invoices) {
+    const j = state.ledger.journals.find(
+      (x) => x.source.type === "supplier-invoice" && x.source.id === invoice.id,
+    );
+    if (!j) continue;
+    assert.equal(
+      j.mappingId,
+      invoice.deferralId ? "AP-INV-DEF" : "AP-INV-STD",
+      `invoice ${invoice.ref} used mapping ${j.mappingId}`,
+    );
+  }
+});
+ok("the exchange difference rule drops out when there is nothing to post", () => {
+  const fresh = buildState();
+  const invoice = fresh.invoices.find((i) => i.currency === BASE_CURRENCY && i.baseAmount > 0);
+  const { entry } = previewPayment(fresh, {
+    invoiceId: invoice.id, date: "2026-10-20", bankAccount: "1010",
+    payForeign: invoice.fxAmount, payRate: invoice.rate,
+  });
+  assert.equal(entry.lines.length, 2, "a same-currency settlement should post two lines");
+  assert.ok(!entry.lines.some((l) => l.account === "6100"), "no exchange difference should be posted");
+});
+
+section("General ledger");
+ok("opening balance plus movement equals closing, for every account and scope", () => {
+  for (const { label, scope } of SCOPES) {
+    for (const a of ACCOUNTS) {
+      const opening = balance(state.ledger, { codes: [a.code], scope, to: "2026-09-30" });
+      const movement = balance(state.ledger, { codes: [a.code], scope, from: "2026-10-01", to: "2026-10-31" });
+      const closing = balance(state.ledger, { codes: [a.code], scope, to: "2026-10-31" });
+      eq(opening + movement, closing, `${label} · ${a.code} ${a.name}`);
+    }
+  }
+});
+ok("the trial balance nets to nil and its debits equal its credits", () => {
+  for (const { label, scope } of SCOPES) {
+    const rows = trialBalance(state.ledger, { scope, to: "2026-10-31" });
+    const dr = rows.reduce((t, r) => t + r.debit, 0);
+    const cr = rows.reduce((t, r) => t + r.credit, 0);
+    eq(dr, cr, `${label}: trial balance debits vs credits`);
+  }
+});
+ok("the general ledger agrees with the statements account by account", () => {
+  const bs = computeReport(bsSpec(), state.ledger, { from: FY.start, to: "2026-10-31" });
+  eq(reportAmount(bs, "1010"), balance(state.ledger, { codes: ["1010"], to: "2026-10-31" }), "Bank – UGX");
+  eq(reportAmount(bs, "2010"), -balance(state.ledger, { codes: ["2010"], to: "2026-10-31" }), "Accounts Payable");
+  const pl = computeReport(plSpec(), state.ledger, { from: FY.start, to: "2026-10-31" });
+  eq(reportAmount(pl, "6070"), balance(state.ledger, { codes: ["6070"], from: FY.start, to: "2026-10-31" }), "Depreciation");
 });
 
 section("Reset");

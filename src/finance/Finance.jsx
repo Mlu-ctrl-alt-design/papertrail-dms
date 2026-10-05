@@ -11,8 +11,9 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Alert20Regular, ArrowReset20Regular, Box20Regular, CalendarClock20Regular,
-  DocumentBulletList20Regular, DocumentTable20Regular, Home20Regular,
-  LockClosed20Regular, Receipt20Regular,
+  Database20Regular, DocumentBulletList20Regular, DocumentTable20Regular,
+  Flow20Regular, Home20Regular, LockClosed20Regular, Receipt20Regular,
+  Scales20Regular,
 } from "@fluentui/react-icons";
 import {
   AppShellRoot, AvatarChip, BP, Btn, C, GlobalStyles, I, Modal, Sidebar,
@@ -28,15 +29,28 @@ import { PayablesView } from "./views/Payables.jsx";
 import { JournalsView } from "./views/Journals.jsx";
 import { PeriodCloseView } from "./views/PeriodClose.jsx";
 import { ReportsView } from "./views/Reports.jsx";
+import { GeneralLedgerView } from "./views/GeneralLedger.jsx";
+import { ChartOfAccountsView } from "./views/ChartOfAccounts.jsx";
+import { LedgerMappingView } from "./views/LedgerMapping.jsx";
 
+// Grouped the way an accounting menu is grouped: the subledgers that raise
+// transactions, the ledger they land in, the reporting on top, and the
+// configuration underneath all of it.
 const NAV = [
   { id: "home", label: "Home", icon: Home20Regular },
+  { section: "Transactions" },
   { id: "assets", label: "Fixed Assets", icon: Box20Regular },
   { id: "deferrals", label: "Deferred Expenses", icon: CalendarClock20Regular },
   { id: "payables", label: "Payables", icon: Receipt20Regular },
+  { section: "General ledger" },
+  { id: "ledger", label: "General Ledger", icon: Scales20Regular },
   { id: "journals", label: "Journals", icon: DocumentBulletList20Regular },
   { id: "period-close", label: "Period Close", icon: LockClosed20Regular },
+  { section: "Reporting" },
   { id: "reports", label: "Reports", icon: DocumentTable20Regular },
+  { section: "Setup" },
+  { id: "accounts", label: "Chart of Accounts", icon: Database20Regular },
+  { id: "mapping", label: "Ledger Mapping", icon: Flow20Regular },
 ];
 
 const VIEWS = {
@@ -44,9 +58,12 @@ const VIEWS = {
   assets: AssetsView,
   deferrals: DeferralsView,
   payables: PayablesView,
+  ledger: GeneralLedgerView,
   journals: JournalsView,
   "period-close": PeriodCloseView,
   reports: ReportsView,
+  accounts: ChartOfAccountsView,
+  mapping: LedgerMappingView,
 };
 
 function Brand() {
@@ -134,7 +151,7 @@ function ShellInner() {
   }, [navLoading]);
 
   const navItems = useMemo(
-    () => NAV.map((n) => ({ ...n, icon: <I as={n.icon} size={18} /> })),
+    () => NAV.map((n) => (n.section ? n : { ...n, icon: <I as={n.icon} size={18} /> })),
     [],
   );
 

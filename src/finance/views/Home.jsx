@@ -212,8 +212,21 @@ export function HomeView() {
             Asset net book values, prepaid balances, every line of every statement and every
             drill-down level are computed from the same posted journal lines. No report total is
             stored anywhere, which is what makes the drill-down honest: the figure the client clicks
-            and the journals underneath it are the same arithmetic read twice.
+            and the journals underneath it are the same arithmetic read twice. And nothing decides on
+            its own what to debit and what to credit — every journal is posted by a ledger entry
+            mapping you can open and read.
           </Hint>
+          <div style={{ marginTop: 12, display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <Btn variant="ghost" size="sm" onClick={() => store.go("accounts")}>
+              Chart of accounts <I as={ArrowRight20Regular} size={13} />
+            </Btn>
+            <Btn variant="ghost" size="sm" onClick={() => store.go("mapping")}>
+              Ledger mapping <I as={ArrowRight20Regular} size={13} />
+            </Btn>
+            <Btn variant="ghost" size="sm" onClick={() => store.go("ledger")}>
+              General ledger <I as={ArrowRight20Regular} size={13} />
+            </Btn>
+          </div>
         </Card>
       </Page>
     </>

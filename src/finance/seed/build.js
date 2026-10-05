@@ -10,16 +10,21 @@ import { emptyLedger, postMany } from "../engine/ledger.js";
 import { acquisitionEntry, depreciationEntry, schedule as assetSchedule } from "../engine/assets.js";
 import { amortisationEntry, schedule as deferralSchedule } from "../engine/deferrals.js";
 import { invoiceEntry, makeInvoice, paymentEntry, settlement } from "../engine/fx.js";
+import { mappedEntry } from "../engine/mapping.js";
 import { generateBackground } from "./generate.js";
 import {
   ASSET_A, DEFERRAL_C, INVOICE_E, MANAGEMENT_FEE, OPENINGS, RATES, SEEDED_PERIODS,
 } from "./scripted.js";
 
+// The opening balances mapping is open-ended: its lines come from the opening
+// trial balance rather than from a fixed debit/credit pair, which is why it has
+// no GL Mapping Rule grid on the Ledger Mapping screen.
 function openingEntries() {
   return OPENINGS.map((o) => ({
     date: "2025-12-31",
     memo: "Opening balances at 31 December 2025",
     source: { type: "opening-balance", id: `${o.company}/${o.branch}` },
+    mappingId: "GL-OPEN",
     lines: [
       ...o.debits.map(([account, amount]) => ({
         account, debit: amount, company: o.company, branch: o.branch,
@@ -38,24 +43,22 @@ function managementFeeEntries() {
   months.forEach((period) => {
     const date = `${period}-28`;
     const ref = `MGT-${period}`;
-    out.push({
+    out.push(mappedEntry("IC-FEE-OUT", {
       date,
       memo: `Management fee ${period} — charged to Hospitality`,
       source: { type: "intercompany-charge", id: `${ref}-out`, period },
-      lines: [
-        { account: "1900", debit: amount, company: charger.company, branch: charger.branch, counterparty: charged.company },
-        { account: "4030", credit: amount, company: charger.company, branch: charger.branch, counterparty: charged.company },
-      ],
-    });
-    out.push({
+      unit: charger,
+      amounts: { feeAmount: amount },
+      counterparty: charged.company,
+    }));
+    out.push(mappedEntry("IC-FEE-IN", {
       date,
       memo: `Management fee ${period} — charged by Holdings`,
       source: { type: "intercompany-charge", id: `${ref}-in`, period },
-      lines: [
-        { account: "6080", debit: amount, company: charged.company, branch: charged.branch, counterparty: charger.company },
-        { account: "2900", credit: amount, company: charged.company, branch: charged.branch, counterparty: charger.company },
-      ],
-    });
+      unit: charged,
+      amounts: { feeAmount: amount },
+      counterparty: charger.company,
+    }));
   });
   return out;
 }
