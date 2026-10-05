@@ -100,6 +100,36 @@ Commercial kitchen equipment · Plant & Equipment · Hospitality · Entebbe · 4
 > anything, and nothing has touched the income statement — the cost is on the balance
 > sheet and will reach the P&L one month at a time.
 
+### And run the depreciation, right here
+
+**Do:** **Back to register**, then click **Run depreciation — October** in the header.
+
+**On screen, before anything posts:** 5 journals · **UGX 4,900,000** · dated 31 Oct 2026 ·
+*Dr Depreciation / Cr Accumulated depreciation* · posted by *Fixed Assets | Depreciation
+Run | Transaction Ledger* — and every asset listed with its charge and which charge of how
+many it is (the Hiace at **10 of 60**).
+
+**Say:**
+> This is the "auto" in your first line. It is a run that belongs to the fixed asset
+> module, and it tells me exactly what it is about to post before it posts anything. Each
+> asset already knows what it owes this month from its own schedule.
+
+**Do:** **Post 5 journals.**
+
+**On screen:** the Hiace's accumulated depreciation goes to **30,000,000** and its net book
+value to **150,000,000**; the register total moves to **UGX 202,400,000**; and the button
+greys out to **Depreciation posted for October**.
+
+**Say:**
+> Run it again and it posts nothing — whatever is already in the ledger is not due. And
+> notice the period is still open at the top: running depreciation and closing the month
+> are two different things.
+
+> **Presenter note.** Doing it here is the strongest moment for request 1, and scene 4
+> then shows step 1 already posted — which is the point, because the run belongs to this
+> module rather than to period close. If you would rather keep everything for scene 4,
+> skip this beat and use **Run all and close October** there instead.
+
 ---
 
 ## Scene 2 — Deferred expenses · `#/finance/deferrals` · 4 min
@@ -197,21 +227,34 @@ Dr Realised FX Gain/Loss 500,000, Cr Bank – UGX 37,500,000.
 
 **Do:** Click **Period Close**.
 
-**On screen:** Open period October 2026 · Depreciation to post **UGX 5,900,000** (6 assets)
-· Amortisation to post **UGX 12,000,000** (2 deferrals) · **8 journals**.
+**On screen:** three numbered steps.
+
+1. **Depreciation — October 2026** · **Posted**, if you ran it in scene 1. The card says so
+   and points at Fixed Assets, "which owns this run".
+2. **Amortisation — October 2026** · **2 pending**, listing the medical insurance and the
+   software licence you captured in scene 2, **UGX 12,000,000**.
+3. **Close October 2026** · disabled, saying in plain words why: *October 2026 cannot be
+   closed yet — 2 amortisation journals still to post.*
 
 **Say:**
-> Before it posts anything it tells me exactly what it is going to post. Six assets —
-> including the kitchen equipment I bought ten minutes ago. Two deferrals — including the
-> software licence. Each one already knows what it owes this period from its own schedule.
+> Three separate things. Depreciation is a run that belongs to fixed assets. Amortisation
+> is a run that belongs to prepayments. Closing is neither — it posts nothing at all, it
+> just locks the month. And it will not let me lock a month that is still missing its own
+> charges.
 
-**Do:** **Run October 2026 month-end** → **Post 8 journals**.
+**Do:** **Run amortisation — UGX 12,000,000** → **Post 2 journals**.
+
+**Do:** **Close October 2026** → **Close the period**.
 
 **On screen:** the context bar flips to **Open period: November 2026 · Books closed to
-31 Oct 2026**, and a card confirms what was posted.
+31 Oct 2026**.
 
 **Say:**
-> This is the "auto" in your email. Nobody raised a journal.
+> Nobody raised a journal. This is the "auto" in your email, and it is auditable — each of
+> those runs told me what it would post before it posted it.
+
+**If you skipped the scene 1 run,** use **Run all and close October** in the header
+instead: one click does the same three steps in order, and the confirm lists all three.
 
 **Do:** Follow the **See the asset register →** link, then open the Hiace.
 
@@ -222,8 +265,8 @@ Dr Realised FX Gain/Loss 500,000, Cr Bank – UGX 37,500,000.
 **On screen:** Recognised **UGX 100,000,000** · **Prepaid balance UGX 20,000,000**.
 
 **Say:**
-> 153 became 150. Thirty million prepaid became twenty. One click did both, across two
-> companies.
+> 153 became 150. Thirty million prepaid became twenty, across two companies, and I never
+> opened a journal.
 
 ---
 
@@ -431,7 +474,9 @@ If any of these is different, stop and reset.
 |---|---|
 | Asset register, opening | NBV **207,300,000** |
 | Hiace, opening | Cost 180,000,000 · Accumulated 27,000,000 · **NBV 153,000,000** |
-| Hiace, after the October run | Accumulated 30,000,000 · **NBV 150,000,000** |
+| Hiace, after the depreciation run | Accumulated 30,000,000 · **NBV 150,000,000** |
+| Depreciation run, October, before asset B | 5 journals · **UGX 4,900,000** |
+| Depreciation run, October, after asset B | 6 journals · **UGX 5,900,000** |
 | Kitchen equipment, on save | 48 charges of **1,000,000** · NBV 48,000,000 |
 | Kitchen equipment, after the run | Accumulated 1,000,000 · **NBV 47,000,000** |
 | Medical insurance, opening | Expensed 90,000,000 · **Prepaid 30,000,000** |
@@ -450,6 +495,10 @@ If any of these is different, stop and reset.
 ---
 
 ## Questions he may ask, and the honest answer
+
+**"Can we run depreciation without closing the month?"** Yes — that is the button on the
+asset register, and the period stays open. The two runs and the close are three separate
+acts; a period will not close while either run still owes it something.
 
 **"Can it do reducing balance?"** The engine takes the method from the asset category;
 straight line is what is built. Reducing balance and disposals are the next thing in.

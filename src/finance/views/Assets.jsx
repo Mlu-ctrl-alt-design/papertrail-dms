@@ -13,7 +13,7 @@ import {
 } from "../../components/index.js";
 import {
   ALL_BRANCHES, branchName, companyShort, monthLabel, monthStart,
-  money, prettyDate, scopeLabel,
+  money, plural, prettyDate, scopeLabel,
 } from "../config.js";
 import { ASSET_CATEGORIES, assetCategory } from "../engine/coa.js";
 import {
@@ -27,6 +27,8 @@ import {
   ScheduleTable, StatusPill, SubHead,
 } from "../ui.jsx";
 import { ASSET_B_INPUT } from "../seed/scripted.js";
+import { depreciationPlan } from "../engine/actions.js";
+import { RunButton, RunModal } from "./PeriodRun.jsx";
 
 export function AssetsView() {
   const store = useFinance();
@@ -44,6 +46,12 @@ function AssetRegister() {
   const compact = useMaxWidth(BP.lg);
   const [category, setCategory] = useState("all");
   const [newOpen, setNewOpen] = useState(false);
+  const [runOpen, setRunOpen] = useState(false);
+
+  // The depreciation run belongs to this module, so it is fired from here. It
+  // posts the open period's charges and nothing else — closing the period is a
+  // separate act on the Period Close screen.
+  const plan = useMemo(() => depreciationPlan(store), [store]);
 
   const rows = useMemo(() => {
     const { company, branch } = store.scope;
@@ -105,7 +113,12 @@ function AssetRegister() {
       <ViewHeader
         title="Fixed asset register"
         subtitle={`${scopeLabel(store.scope)} · net book value ${money(totals.nbv)}`}
-        action={<Btn onClick={() => setNewOpen(true)}><I as={Add20Regular} size={14} /> New asset</Btn>}
+        action={
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <RunButton plan={plan} variant="ghost" onClick={() => setRunOpen(true)} />
+            <Btn onClick={() => setNewOpen(true)}><I as={Add20Regular} size={14} /> New asset</Btn>
+          </div>
+        }
       />
       <Page>
         <Row>
@@ -113,7 +126,9 @@ function AssetRegister() {
           <Stat label="Accumulated depreciation" value={money(totals.accum)} tone={C.danger} basis={190} />
           <Stat label="Net book value" value={money(totals.nbv)} tone={C.brand} basis={190} />
           <Stat label="Charge per month" value={money(totals.monthly)}
-                sub={`Posts automatically when ${monthLabel(store.openPeriod)} is closed`} basis={190} />
+                sub={plan.journalCount
+                  ? `${money(plan.total)} due for ${monthLabel(store.openPeriod)} across ${plan.journalCount} assets`
+                  : `${monthLabel(store.openPeriod)} already run`} basis={190} />
         </Row>
 
         <Card
@@ -163,6 +178,22 @@ function AssetRegister() {
           </div>
         </Card>
       </Page>
+
+      {runOpen && (
+        <RunModal
+          plan={plan}
+          onClose={() => setRunOpen(false)}
+          onRun={() => {
+            const ran = store.runDepreciation();
+            setRunOpen(false);
+            toast(
+              `Depreciation posted for ${monthLabel(ran.period)}`,
+              `${plural(ran.journalCount, "journal")} · ${money(ran.total)} — net book values have moved`,
+              { color: C.success },
+            );
+          }}
+        />
+      )}
 
       {newOpen && (
         <NewAssetPanel

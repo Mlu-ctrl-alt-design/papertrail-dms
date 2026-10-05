@@ -185,3 +185,7 @@ export function prevDay(iso) {
   const key = `${py}-${String(pm).padStart(2, "0")}`;
   return monthEnd(key);
 }
+
+// "1 journal" / "5 journals". Small, but a demo that says "1 journals" in front
+// of a finance audience has already lost a little credibility.
+export const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;

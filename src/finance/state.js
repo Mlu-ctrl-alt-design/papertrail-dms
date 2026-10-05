@@ -92,6 +92,38 @@ export function useFinanceStore() {
     return created;
   }, []);
 
+  // The three period-end acts, each callable on its own from the screen that
+  // owns it, plus the one-click version that does all three in order.
+  const runDepreciation = useCallback((period) => {
+    let result = null;
+    setState((s) => {
+      const r = actions.runDepreciation(s, period);
+      result = r.plan;
+      return r.state;
+    });
+    return result;
+  }, []);
+
+  const runAmortisation = useCallback((period) => {
+    let result = null;
+    setState((s) => {
+      const r = actions.runAmortisation(s, period);
+      result = r.plan;
+      return r.state;
+    });
+    return result;
+  }, []);
+
+  const closePeriod = useCallback((period) => {
+    let result = null;
+    setState((s) => {
+      const r = actions.closePeriod(s, period);
+      result = r.period;
+      return r.state;
+    });
+    return result;
+  }, []);
+
   const runMonthEnd = useCallback((period) => {
     let result = null;
     setState((s) => {
@@ -111,7 +143,8 @@ export function useFinanceStore() {
       scope, setScope,
       route, go,
       reset,
-      createAsset, createSupplierInvoice, payInvoice, runMonthEnd,
+      createAsset, createSupplierInvoice, payInvoice,
+      runDepreciation, runAmortisation, closePeriod, runMonthEnd,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [state, scope, route, openPeriod],

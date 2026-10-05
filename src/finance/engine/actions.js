@@ -170,9 +170,16 @@ export function payInvoice(state, input) {
   return { state: next, payment, calc, journal, invoice };
 }
 
-// ─── Scene 4: month-end ───────────────────────────────────────────────────────
+// ─── Scene 4: the period-end runs ─────────────────────────────────────────────
+//
+// Depreciation and amortisation are two runs, not one. In an ERP they belong to
+// their own modules — the ledger entry mappings are literally "Fixed Assets |
+// Depreciation Run" and "Prepayments | Amortisation Run" — and closing the
+// period is a third, separate act that only locks what the runs produced. So
+// each can be fired on its own from the screen that owns it, and the period
+// cannot be closed while either still has something outstanding.
 
-// The review step: everything the run would post, before it posts anything.
+// The review step: everything the runs would post, before they post anything.
 export function monthEndPlan(state, period = openPeriod(state)) {
   const depreciation = depreciationDue(state.ledger, state.assets, period);
   const amortisation = amortisationDue(state.ledger, state.deferrals, period);
@@ -187,27 +194,115 @@ export function monthEndPlan(state, period = openPeriod(state)) {
   };
 }
 
-export function runMonthEnd(state, period = openPeriod(state)) {
+// What one run would post on its own.
+export function depreciationPlan(state, period = openPeriod(state)) {
+  const rows = depreciationDue(state.ledger, state.assets, period);
+  return {
+    kind: "depreciation",
+    period,
+    rows,
+    total: rows.reduce((a, r) => a + r.amount, 0),
+    journalCount: rows.length,
+    runnable: isOpen(state, period) && rows.length > 0,
+  };
+}
+
+export function amortisationPlan(state, period = openPeriod(state)) {
+  const rows = amortisationDue(state.ledger, state.deferrals, period);
+  return {
+    kind: "amortisation",
+    period,
+    rows,
+    total: rows.reduce((a, r) => a + r.amount, 0),
+    journalCount: rows.length,
+    runnable: isOpen(state, period) && rows.length > 0,
+  };
+}
+
+const requireOpen = (state, period) => {
   if (!isOpen(state, period)) {
     throw new Error(`${period} is not the open period — the open period is ${openPeriod(state)}`);
   }
-  const plan = monthEndPlan(state, period);
-  const entries = [
-    ...plan.depreciation.map((r) => depreciationEntry(r.asset, period, r.amount)),
-    ...plan.amortisation.map((r) => amortisationEntry(r.deferral, period, r.amount)),
-  ];
-  const ledger = postMany(state.ledger, entries);
+};
+
+// One journal per asset, so each balances inside its own company and branch.
+// Running it twice posts nothing the second time: an asset whose schedule row for
+// the period is already in the ledger is simply not due.
+export function runDepreciation(state, period = openPeriod(state)) {
+  requireOpen(state, period);
+  const plan = depreciationPlan(state, period);
+  const ledger = postMany(
+    state.ledger,
+    plan.rows.map((r) => depreciationEntry(r.asset, period, r.amount)),
+  );
   const next = logged(
-    { ...state, ledger, closedThrough: period },
+    { ...state, ledger },
     {
-      kind: "close",
-      label: `${period} closed — ${plan.depreciation.length} depreciation and ${plan.amortisation.length} amortisation journals posted`,
-      id: period,
+      kind: "depreciation-run",
+      label: `Depreciation run for ${period} — ${plan.rows.length} journals posted`,
+      id: `DEP-${period}`,
       date: monthEnd(period),
       journalId: null,
     },
   );
   return { state: next, plan, journals: ledger.journals.slice(state.ledger.journals.length) };
+}
+
+export function runAmortisation(state, period = openPeriod(state)) {
+  requireOpen(state, period);
+  const plan = amortisationPlan(state, period);
+  const ledger = postMany(
+    state.ledger,
+    plan.rows.map((r) => amortisationEntry(r.deferral, period, r.amount)),
+  );
+  const next = logged(
+    { ...state, ledger },
+    {
+      kind: "amortisation-run",
+      label: `Amortisation run for ${period} — ${plan.rows.length} journals posted`,
+      id: `AMO-${period}`,
+      date: monthEnd(period),
+      journalId: null,
+    },
+  );
+  return { state: next, plan, journals: ledger.journals.slice(state.ledger.journals.length) };
+}
+
+// Closing only locks the period. It refuses while either run still owes the
+// period something, which is the rule that makes "closed" mean anything.
+export function closePeriod(state, period = openPeriod(state)) {
+  requireOpen(state, period);
+  const plan = monthEndPlan(state, period);
+  if (plan.journalCount > 0) {
+    throw new Error(
+      `${period} cannot be closed: ${plan.depreciation.length} depreciation and ${plan.amortisation.length} amortisation journals are still outstanding`,
+    );
+  }
+  return {
+    state: logged(
+      { ...state, closedThrough: period },
+      {
+        kind: "close",
+        label: `${period} closed — ${addMonths(period, 1)} is now the open period`,
+        id: period,
+        date: monthEnd(period),
+        journalId: null,
+      },
+    ),
+    period,
+  };
+}
+
+// The one-click version: run whatever is outstanding, then close. This is what
+// the Run month-end button does, and it is exactly the three steps in order.
+export function runMonthEnd(state, period = openPeriod(state)) {
+  requireOpen(state, period);
+  const plan = monthEndPlan(state, period);
+  let next = state;
+  if (plan.depreciation.length) next = runDepreciation(next, period).state;
+  if (plan.amortisation.length) next = runAmortisation(next, period).state;
+  next = closePeriod(next, period).state;
+  return { state: next, plan, journals: next.ledger.journals.slice(state.ledger.journals.length) };
 }
 
 // ─── Demo helpers ─────────────────────────────────────────────────────────────

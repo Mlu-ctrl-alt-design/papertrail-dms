@@ -14,7 +14,7 @@ import {
 } from "../../components/index.js";
 import {
   ALL_BRANCHES, branchName, companyShort, monthLabel, monthStart,
-  money, prettyDate, scopeLabel,
+  money, plural, prettyDate, scopeLabel,
 } from "../config.js";
 import { ACCOUNTS, PREPAID_CODES, accountName } from "../engine/coa.js";
 import {
@@ -28,6 +28,8 @@ import {
   ScheduleTable, StatusPill, SubHead,
 } from "../ui.jsx";
 import { DEFERRAL_D_INPUT } from "../seed/scripted.js";
+import { amortisationPlan } from "../engine/actions.js";
+import { RunButton, RunModal } from "./PeriodRun.jsx";
 
 const EXPENSE_OPTIONS = ACCOUNTS
   .filter((a) => a.type === "expense" && a.group === "opex")
@@ -50,6 +52,11 @@ function DeferralList() {
   const toast = useToast();
   const compact = useMaxWidth(BP.lg);
   const [newOpen, setNewOpen] = useState(false);
+  const [runOpen, setRunOpen] = useState(false);
+
+  // Same shape as the depreciation run on the asset register: this module owns
+  // its own period-end run and can fire it without closing the period.
+  const plan = useMemo(() => amortisationPlan(store), [store]);
 
   const rows = useMemo(() => {
     const { company, branch } = store.scope;
@@ -112,7 +119,12 @@ function DeferralList() {
       <ViewHeader
         title="Deferred expenses"
         subtitle={`${scopeLabel(store.scope)} · ${money(totals.left)} still prepaid`}
-        action={<Btn onClick={() => setNewOpen(true)}><I as={Add20Regular} size={14} /> Supplier invoice</Btn>}
+        action={
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <RunButton plan={plan} variant="ghost" onClick={() => setRunOpen(true)} />
+            <Btn onClick={() => setNewOpen(true)}><I as={Add20Regular} size={14} /> Supplier invoice</Btn>
+          </div>
+        }
       />
       <Page>
         <Row>
@@ -122,7 +134,9 @@ function DeferralList() {
           <Stat label="Prepaid balance" value={money(totals.left)} tone={C.brand}
                 sub="Agrees with Prepayments on the balance sheet" basis={190} />
           <Stat label="Releases per month" value={money(totals.monthly)}
-                sub={`Posts when ${monthLabel(store.openPeriod)} is closed`} basis={190} />
+                sub={plan.journalCount
+                  ? `${money(plan.total)} due for ${monthLabel(store.openPeriod)} across ${plan.journalCount} items`
+                  : `${monthLabel(store.openPeriod)} already run`} basis={190} />
         </Row>
 
         <Card title="Deferrals" subtitle="Click an item to see its schedule and journals" pad={compact ? 8 : 14}>
@@ -135,6 +149,22 @@ function DeferralList() {
           />
         </Card>
       </Page>
+
+      {runOpen && (
+        <RunModal
+          plan={plan}
+          onClose={() => setRunOpen(false)}
+          onRun={() => {
+            const ran = store.runAmortisation();
+            setRunOpen(false);
+            toast(
+              `Amortisation posted for ${monthLabel(ran.period)}`,
+              `${plural(ran.journalCount, "journal")} · ${money(ran.total)} — prepaid balances have moved`,
+              { color: C.success },
+            );
+          }}
+        />
+      )}
 
       {newOpen && (
         <NewDeferredInvoicePanel
