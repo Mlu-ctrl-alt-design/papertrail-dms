@@ -180,3 +180,8 @@ export const MANAGEMENT_FEE = {
 // The periods the seed posts depreciation and amortisation for. October is left
 // open: it is what the presenter runs in scene 4.
 export const SEEDED_PERIODS = MANAGEMENT_FEE.months;
+
+// October trades like any other month — it is simply not finished, and not
+// closed. Background activity runs into it up to the anchor date; depreciation
+// and amortisation do not, because that is what month-end is for.
+export const OPEN_PERIOD = "2026-10";

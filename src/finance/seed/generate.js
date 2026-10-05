@@ -6,10 +6,10 @@
 // prepaid insurance, medical insurance, software licences, management fees and
 // realised FX — so it can never contradict PRD section 4.3.
 
-import { monthEnd } from "../config.js";
+import { TODAY, monthEnd, monthKey } from "../config.js";
 import { invoiceEntry, makeInvoice, paymentEntry, settlement } from "../engine/fx.js";
 import { acquisitionEntry } from "../engine/assets.js";
-import { SEEDED_PERIODS } from "./scripted.js";
+import { OPEN_PERIOD, SEEDED_PERIODS } from "./scripted.js";
 
 // mulberry32 — small, fast, and stable across engines, which is what makes the
 // "two builds produce identical ledgers" check meaningful.
@@ -162,7 +162,21 @@ export function generateBackground(seed = 20261020) {
   // Invoices awaiting settlement in the following month, per branch.
   const unpaid = new Map(BRANCH_PROFILES.map((p) => [`${p.company}/${p.branch}`, []]));
 
-  for (const period of SEEDED_PERIODS) {
+  // The open period is a month in progress, not an empty one: the demo is
+  // anchored to 20 October, so October carries the trading that has happened by
+  // then and nothing that only happens at month end. Without this the
+  // comparative column on the October statements would read as a dead month.
+  const PERIODS = [...SEEDED_PERIODS, OPEN_PERIOD];
+  const CUTOFF = Number(TODAY.slice(8));
+
+  for (const period of PERIODS) {
+    const partial = period === monthKey(TODAY);
+    // Aggregate postings — takings, receipts — are a month's worth. In a part
+    // month they are pro-rated to the days that have actually happened.
+    const share = partial ? CUTOFF / 30 : 1;
+    const by = (n) => (partial ? Math.min(n, CUTOFF) : n);
+    const happened = (n) => !partial || n <= CUTOFF;
+
     for (const p of BRANCH_PROFILES) {
       const unit = { company: p.company, branch: p.branch };
       const key = `${p.company}/${p.branch}`;
@@ -175,23 +189,26 @@ export function generateBackground(seed = 20261020) {
       const raised = [];
 
       if (p.kind === "trade") {
-        cash(day(period, 26), `Till takings ${period}`, "1010", "4010", j(p.cashSales), unit);
-        cash(day(period, 27), `Function and event invoicing ${period}`, "1100", "4010", j(p.creditSales), unit);
+        cash(day(period, by(26)), `Till takings ${period}`, "1010", "4010", j(p.cashSales * share), unit);
+        cash(day(period, by(27)), `Function and event invoicing ${period}`, "1100", "4010", j(p.creditSales * share), unit);
         raised.push(supplierInvoice(period, unit, {
           supplier: pick(SUPPLIERS.cos), description: "Food and beverage stock",
-          account: "5010", amount: j(p.cos), dayOfMonth: 8,
+          account: "5010", amount: j(p.cos * share), dayOfMonth: 8,
         }));
         raised.push(supplierInvoice(period, unit, {
           supplier: pick(SUPPLIERS.supplies), description: "Kitchen consumables",
-          account: "6040", amount: j(p.supplies), dayOfMonth: 12,
+          account: "6040", amount: j(p.supplies * share), dayOfMonth: 12,
         }));
-        raised.push(supplierInvoice(period, unit, {
-          supplier: pick(SUPPLIERS.utilities), description: `Utilities ${period}`,
-          account: "6030", amount: j(p.utilities), dayOfMonth: 20,
-        }));
-        cash(monthEnd(period), `Payroll ${period}`, "6010", "1010", j(p.salaries), unit);
+        if (happened(20)) {
+          raised.push(supplierInvoice(period, unit, {
+            supplier: pick(SUPPLIERS.utilities), description: `Utilities ${period}`,
+            account: "6030", amount: j(p.utilities), dayOfMonth: 20,
+          }));
+        }
+        // Payroll runs at month end, so a part month has not paid it yet.
+        if (!partial) cash(monthEnd(period), `Payroll ${period}`, "6010", "1010", j(p.salaries), unit);
         cash(day(period, 2), `Premises rent ${period}`, "6020", "1010", j(p.rent), unit);
-        cash(day(period, 22), `Customer receipts ${period}`, "1010", "1100", j(p.receipts), unit);
+        cash(day(period, by(22)), `Customer receipts ${period}`, "1010", "1100", j(p.receipts * share), unit);
       }
 
       if (p.kind === "rental") {
@@ -201,9 +218,9 @@ export function generateBackground(seed = 20261020) {
           supplier: pick(SUPPLIERS.utilities), description: `Common area utilities ${period}`,
           account: "6030", amount: j(p.utilities), dayOfMonth: 18,
         }));
-        cash(monthEnd(period), `Payroll ${period}`, "6010", "1010", j(p.salaries), unit);
-        cash(day(period, 24), `Tenant receipts ${period}`, "1010", "1100", j(p.receipts), unit);
-        if (p.loan) {
+        if (!partial) cash(monthEnd(period), `Payroll ${period}`, "6010", "1010", j(p.salaries), unit);
+        cash(day(period, by(24)), `Tenant receipts ${period}`, "1010", "1100", j(p.receipts * share), unit);
+        if (p.loan && !partial) {
           const principal = p.loan.principal;
           const interest = j(p.loan.interest);
           entries.push({
@@ -220,7 +237,7 @@ export function generateBackground(seed = 20261020) {
       }
 
       if (p.kind === "admin") {
-        cash(monthEnd(period), `Payroll ${period}`, "6010", "1010", j(p.salaries), unit);
+        if (!partial) cash(monthEnd(period), `Payroll ${period}`, "6010", "1010", j(p.salaries), unit);
         cash(day(period, 2), `Head office rent ${period}`, "6020", "1010", j(p.rent), unit);
         raised.push(supplierInvoice(period, unit, {
           supplier: pick(SUPPLIERS.utilities), description: `Head office utilities ${period}`,
