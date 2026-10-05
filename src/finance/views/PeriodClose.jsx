@@ -74,7 +74,11 @@ export function PeriodCloseView() {
                 sub="One per asset and per deferral, so each balances in its own branch" basis={210} />
         </Row>
 
-        {result && <RunResult result={result} onDismiss={() => setResult(null)} />}
+        {/* Derived rather than cleared: a Reset reopens the period, and a card
+            saying it was posted would then be a lie. */}
+        {result && result.period <= store.closedThrough && (
+          <RunResult result={result} onDismiss={() => setResult(null)} />
+        )}
 
         {plan.journalCount === 0 ? (
           <Card title={`Nothing to post for ${monthLabel(period)}`} pad={16}>
